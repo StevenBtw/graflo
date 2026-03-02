@@ -114,56 +114,6 @@ def edge_with_weights():
 
 
 @pytest.fixture()
-def edge_indexes():
-    tc = yaml.safe_load(
-        """
-        source: entity
-        target: entity
-        purpose: aux
-        indexes:
-        -   
-            fields:
-            -   start_date
-            -   end_date
-        -   
-            fields:
-            -   spec
-    """
-    )
-    return tc
-
-
-@pytest.fixture()
-def edge_with_vertex_indexes():
-    tc = yaml.safe_load(
-        """
-        source: entity
-        target: entity
-        indexes:
-        -   name: publication
-        -   exclude_edge_endpoints: true
-            unique: false
-            name: publication
-            fields:
-            -   _key
-    """
-    )
-    return tc
-
-
-@pytest.fixture()
-def index_a():
-    tc = yaml.safe_load(
-        """
-    fields:
-        -   start_date
-        -   end_date
-    """
-    )
-    return tc
-
-
-@pytest.fixture()
 def vertex_config_kg():
     vc = yaml.safe_load(
         """
@@ -208,29 +158,11 @@ def edge_config_kg():
     edges:
     -   source: entity
         target: entity
-        index:
-        -   name: publication
-            fields:
-            -   _key
-        -   exclude_edge_endpoints: true
-            unique: false
-            fields:
-            -   publication@_key
     -   source: entity
         target: entity
-        purpose: aux
-        index:
-        -   fields:
-            -   start_date
-            -   end_date
-        -   fields:
-            -   spec
+        relation: aux
     -   source: mention
         target: entity
-        index:
-        -   name: publication
-            fields:
-            -   _key
     """
     )
     return tc
@@ -562,9 +494,6 @@ def resource_kg_menton_triple():
         weights:
             direct:
             -   _role
-        indexes:
-        -   fields:
-            -   _role
     """)
     return an
 
@@ -710,10 +639,6 @@ def ec_ticker():
             -   name: feature
                 fields:
                 -   name
-        indexes:
-        -   fields:
-            -   t_obs
-            -   name
     """
     )
     return EdgeConfig.from_dict(tc)

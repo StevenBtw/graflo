@@ -1,6 +1,10 @@
 import logging
 
+import pytest
+
+from graflo.architecture.edge import EdgeConfig
 from graflo.architecture.resource import Resource, _resolve_type_caster
+from graflo.architecture.vertex import VertexConfig
 
 logger = logging.getLogger(__name__)
 
@@ -31,3 +35,31 @@ def test_resource_types_uses_safe_caster_resolution():
     )
     assert resource._types["age"] is int
     assert "unsafe" not in resource._types
+
+
+def test_resource_infer_edge_selectors_are_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        Resource.from_dict(
+            {
+                "resource_name": "typed_resource",
+                "pipeline": [{"vertex": "person"}],
+                "infer_edge_only": [{"source": "a", "target": "b"}],
+                "infer_edge_except": [{"source": "a", "target": "c"}],
+            }
+        )
+
+
+def test_resource_infer_edge_selector_references_unknown_edge():
+    resource = Resource.from_dict(
+        {
+            "resource_name": "typed_resource",
+            "pipeline": [{"vertex": "person"}],
+            "infer_edge_only": [{"source": "a", "target": "b"}],
+        }
+    )
+    vc = VertexConfig.from_dict(
+        {"vertices": [{"name": "person", "fields": ["id"], "identity": ["id"]}]}
+    )
+    ec = EdgeConfig.from_dict({"edges": [{"source": "person", "target": "person"}]})
+    with pytest.raises(ValueError, match="unknown edge selectors"):
+        resource.finish_init(vertex_config=vc, edge_config=ec, transforms={})

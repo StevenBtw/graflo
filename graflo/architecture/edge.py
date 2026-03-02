@@ -168,29 +168,29 @@ class Edge(EdgeBase):
     """Represents an edge in the graph database.
 
     An edge connects two vertices and can have various configurations for
-    indexing, weights, and relationship types.
+    identities, weights, and relationship types.
 
     Attributes:
         source: Source vertex name
         target: Target vertex name
-        indexes: List of indexes for the edge
+        identities: Logical candidate identity keys for the edge
         weights: Optional weight configuration
         relation: Optional relation name (for Neo4j)
-        purpose: Optional purpose for utility collections
         match_source: Optional source discriminant field
         match_target: Optional target discriminant field
         type: Edge type (DIRECT or INDIRECT)
-        aux: Whether this is an auxiliary edge
         by: Optional vertex name for indirect edges
         graph_name: Optional graph name (ArangoDB only, set in finish_init)
         database_name: Optional database-specific edge identifier (ArangoDB only, set in finish_init).
                        For ArangoDB, this corresponds to the edge collection name.
     """
 
-    indexes: list[Index] = PydanticField(
+    identities: list[list[str]] = PydanticField(
         default_factory=list,
-        alias="index",
-        description="List of index definitions for this edge. Alias: index.",
+        description=(
+            "Logical candidate identity keys for this edge. "
+            "Each key is a list of identity tokens/fields."
+        ),
     )
     weights: WeightConfig | None = PydanticField(
         default=None,
@@ -201,19 +201,9 @@ class Edge(EdgeBase):
     _database_features: DatabaseFeatures | None = PrivateAttr(default=None)
     _store_extracted_relation_as_weight: bool = PrivateAttr(default=False)
 
-    purpose: str | None = PydanticField(
-        default=None,
-        description="Optional purpose label for utility edge collections between same vertex types.",
-    )
-
     type: EdgeType = PydanticField(
         default=EdgeType.DIRECT,
         description="Edge type: DIRECT (created during ingestion) or INDIRECT (pre-existing collection).",
-    )
-
-    aux: bool = PydanticField(
-        default=False,
-        description="If True, edge is initialized in DB but not used by graflo ingestion.",
     )
 
     by: str | None = PydanticField(
@@ -231,6 +221,43 @@ class Edge(EdgeBase):
 
     _source: str | None = PrivateAttr(default=None)
     _target: str | None = PrivateAttr(default=None)
+
+    @field_validator("identities", mode="before")
+    @classmethod
+    def normalize_identities(cls, v: Any) -> Any:
+        if v is None:
+            return []
+        if isinstance(v, list):
+            # identities can be provided as [["source", "target"], ["source", "target", "pub_id"]]
+            if all(isinstance(item, str) for item in v):
+                return [list(v)]
+            normalized: list[list[str]] = []
+            for item in v:
+                if isinstance(item, tuple):
+                    item = list(item)
+                if not isinstance(item, list) or not all(
+                    isinstance(token, str) for token in item
+                ):
+                    raise ValueError("edge identities must be list[list[str]]")
+                normalized.append(list(item))
+            return normalized
+        raise ValueError("edge identities must be list[list[str]]")
+
+    @model_validator(mode="after")
+    def normalize_identity_keys(self) -> "Edge":
+        deduped_keys: list[list[str]] = []
+        seen_keys: set[tuple[str, ...]] = set()
+        for key in self.identities:
+            deduped_tokens: list[str] = []
+            for token in key:
+                if token not in deduped_tokens:
+                    deduped_tokens.append(token)
+            key_tuple = tuple(deduped_tokens)
+            if key_tuple and key_tuple not in seen_keys:
+                seen_keys.add(key_tuple)
+                deduped_keys.append(deduped_tokens)
+        object.__setattr__(self, "identities", deduped_keys)
+        return self
 
     @property
     def relation_dbname(self) -> str | None:
@@ -288,16 +315,14 @@ class Edge(EdgeBase):
 
         # ArangoDB-specific names are delegated to DatabaseFeatures.
         if self._database_features is not None:
-            self.graph_name = self._database_features.edge_graph_name(
-                self.edge_id,
-                source_storage=self._source,
-                target_storage=self._target,
-            )
             self.database_name = self._database_features.edge_storage_name(
                 self.edge_id,
                 source_storage=self._source,
                 target_storage=self._target,
             )
+            # Graph and edge storage names are intentionally aligned so a purpose
+            # uniquely identifies the physical edge variant without redundant naming.
+            self.graph_name = self.database_name
 
         # TigerGraph requires named edge types (relations), so assign default if missing
         if db_flavor == DBType.TIGERGRAPH and self.relation is None:
@@ -329,69 +354,32 @@ class Edge(EdgeBase):
                         Field(name=self.relation_field, type=FieldType.STRING)
                     )
 
-                # TigerGraph: optionally add index for relation_field if it's dynamic
-                # Check if the field already has an index
-                has_index = any(
-                    self.relation_field in idx.fields for idx in self.indexes
-                )
-                if not has_index:
-                    # Add a persistent secondary index for the relation field
-                    self.indexes.append(Index(fields=[self.relation_field]))
-
         else:
             self._store_extracted_relation_as_weight = False
 
-        self._init_indices(vertex_config, db_flavor)
+        self._validate_identity_tokens()
 
-    def _init_indices(self, vc: VertexConfig, db_flavor: DBType):
-        """Initialize indices for the edge.
-
-        Args:
-            vc: Vertex configuration
-        """
-        self.indexes = [
-            self._init_index(index, vc, db_flavor) for index in self.indexes
+    def _validate_identity_tokens(self) -> None:
+        """Validate edge identity keys against reserved tokens and declared edge fields."""
+        reserved = {"source", "target", "relation"}
+        direct_weight_fields = set()
+        if self.weights is not None:
+            direct_weight_fields = set(self.weights.direct_names)
+        relation_field = (
+            {self.relation_field} if self.relation_field is not None else set()
+        )
+        allowed_fields = reserved | direct_weight_fields | relation_field
+        unknown_by_key = [
+            [token for token in key if token not in allowed_fields]
+            for key in self.identities
         ]
-
-    def _init_index(self, index: Index, vc: VertexConfig, db_flavor: DBType) -> Index:
-        """Initialize a single index for the edge.
-
-        Args:
-            index: Index to initialize
-            vc: Vertex configuration
-
-        Returns:
-            Index: Initialized index
-
-        Note:
-            Default behavior for edge indices: adds ["_from", "_to"] for uniqueness
-            in ArangoDB.
-        """
-        index_fields = []
-
-        if index.name is None:
-            index_fields += index.fields
-        else:
-            # add index over a vertex of index.name
-            vertex_prefix = f"{index.name}@"
-            raw_fields = list(index.fields)
-            if not index.exclude_edge_endpoints and db_flavor == DBType.ARANGO:
-                raw_fields = [f for f in raw_fields if f not in {"_from", "_to"}]
-            already_mapped = bool(raw_fields) and all(
-                f.startswith(vertex_prefix) for f in raw_fields
+        unknown_by_key = [u for u in unknown_by_key if u]
+        if unknown_by_key:
+            raise ValueError(
+                "Edge identity key fields must use reserved tokens "
+                "('source', 'target', 'relation') or declared edge direct/relation fields. "
+                f"Edge ({self.source}, {self.target}, {self.relation}) has unknown identity fields: {unknown_by_key}"
             )
-            if already_mapped:
-                index_fields += raw_fields
-            else:
-                fields = raw_fields if raw_fields else vc.index(index.name).fields
-                index_fields += [f"{index.name}@{x}" for x in fields]
-
-        if not index.exclude_edge_endpoints and db_flavor == DBType.ARANGO:
-            if all([item not in index_fields for item in ["_from", "_to"]]):
-                index_fields = ["_from", "_to"] + index_fields
-
-        index.fields = index_fields
-        return index
 
     @property
     def edge_name_dyad(self):
@@ -404,14 +392,8 @@ class Edge(EdgeBase):
 
     @property
     def edge_id(self) -> EdgeId:
-        """Get the edge ID.
-
-        Returns:
-            EdgeId: Tuple of (source, target, purpose)
-        """
-        return self.source, self.target, self.purpose
-
-    # update() inherited from ConfigBaseModel; docstring: same as base, in-place merge.
+        """Alias for edge_id."""
+        return self.source, self.target, self.relation
 
 
 class EdgeConfig(ConfigBaseModel):
@@ -426,7 +408,7 @@ class EdgeConfig(ConfigBaseModel):
 
     edges: list[Edge] = PydanticField(
         default_factory=list,
-        description="List of edge definitions (source, target, weights, indexes, relation, etc.).",
+        description="List of edge definitions (source, target, identities, weights, relation, etc.).",
     )
     _edges_map: dict[EdgeId, Edge] = PrivateAttr()
     _db_flavor: DBType = PrivateAttr(default=DBType.ARANGO)
@@ -437,6 +419,10 @@ class EdgeConfig(ConfigBaseModel):
         """Build internal mapping of edge IDs to edge configurations."""
         object.__setattr__(self, "_edges_map", {e.edge_id: e for e in self.edges})
         return self
+
+    @staticmethod
+    def _map_key(edge: Edge) -> EdgeId:
+        return edge.edge_id
 
     def finish_init(
         self,
@@ -465,32 +451,79 @@ class EdgeConfig(ConfigBaseModel):
                 db_flavor=active_db_flavor,
                 database_features=active_database_features,
             )
+        if active_database_features is not None:
+            self._compile_identity_indexes(
+                db_flavor=active_db_flavor,
+                database_features=active_database_features,
+            )
 
-    def edges_list(self, include_aux=False):
+    def _identity_key_index_fields(
+        self, identity_key: list[str], db_flavor: DBType
+    ) -> list[str]:
+        fields: list[str] = []
+        for token in identity_key:
+            if token == "source":
+                if db_flavor == DBType.ARANGO:
+                    fields.append("_from")
+            elif token == "target":
+                if db_flavor == DBType.ARANGO:
+                    fields.append("_to")
+            elif token == "relation":
+                # Relation is represented as a stored edge field in non-TigerGraph backends.
+                # For TigerGraph it is represented via edge type/discriminator handling.
+                if db_flavor != DBType.TIGERGRAPH:
+                    fields.append("relation")
+            else:
+                fields.append(token)
+        deduped: list[str] = []
+        for field in fields:
+            if field not in deduped:
+                deduped.append(field)
+        return deduped
+
+    def _compile_identity_indexes(
+        self, *, db_flavor: DBType, database_features: DatabaseFeatures
+    ) -> None:
+        for edge in self.edges:
+            # Empty identities => permissive default (allow multi-edges).
+            for identity_key in edge.identities:
+                identity_fields = self._identity_key_index_fields(
+                    identity_key, db_flavor
+                )
+                if not identity_fields:
+                    continue
+                database_features.add_edge_index(
+                    edge.edge_id,
+                    Index(fields=identity_fields, unique=True),
+                    logical_relation=edge.relation,
+                    purpose=None,
+                )
+
+    def edges_list(self, include_aux: bool = False):
         """Get list of edges.
 
         Args:
-            include_aux: Whether to include auxiliary edges
+            include_aux: Deprecated. Kept for backward compatibility.
 
         Returns:
             generator: Generator yielding edge configurations
         """
-        return (e for e in self._edges_map.values() if include_aux or not e.aux)
+        _ = include_aux
+        return (e for e in self._edges_map.values())
 
-    def edges_items(self, include_aux=False):
+    def edges_items(self, include_aux: bool = False):
         """Get items of edges.
 
         Args:
-            include_aux: Whether to include auxiliary edges
+            include_aux: Deprecated. Kept for backward compatibility.
 
         Returns:
             generator: Generator yielding (edge_id, edge) tuples
         """
-        return (
-            (eid, e) for eid, e in self._edges_map.items() if include_aux or not e.aux
-        )
+        _ = include_aux
+        return ((e.edge_id, e) for e in self._edges_map.values())
 
-    def __contains__(self, item: EdgeId | Edge):
+    def __contains__(self, item: EdgeId | EdgeId | Edge):
         """Check if edge exists in configuration.
 
         Args:
@@ -500,14 +533,10 @@ class EdgeConfig(ConfigBaseModel):
             bool: True if edge exists, False otherwise
         """
         if isinstance(item, Edge):
-            eid = item.edge_id
-        else:
-            eid = item
-
-        if eid in self._edges_map:
-            return True
-        else:
-            return False
+            return self._map_key(item) in self._edges_map
+        if isinstance(item, tuple) and len(item) == 3:
+            return item in self._edges_map
+        return False
 
     def update_edges(
         self,
@@ -522,16 +551,17 @@ class EdgeConfig(ConfigBaseModel):
             edge: Edge configuration to update
             vertex_config: Vertex configuration
         """
-        if edge.edge_id in self._edges_map:
-            self._edges_map[edge.edge_id].update(edge)
+        edge_key = self._map_key(edge)
+        if edge_key in self._edges_map:
+            self._edges_map[edge_key].update(edge)
         else:
-            self._edges_map[edge.edge_id] = edge
+            self._edges_map[edge_key] = edge
             self.edges.append(edge)
 
         active_db_flavor = db_flavor or self._db_flavor
         active_database_features = database_features or self._database_features
 
-        self._edges_map[edge.edge_id].finish_init(
+        self._edges_map[edge_key].finish_init(
             vertex_config=vertex_config,
             db_flavor=active_db_flavor,
             database_features=active_database_features,

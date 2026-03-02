@@ -39,7 +39,8 @@ from graflo.onto import DBType
 from graflo.onto import BaseEnum
 from graflo.util.transform import pick_unique_dict
 
-# type for vertex or edge name (index)
+# Edge identifier layers:
+# - EdgeId: schema-level edge definition key (source, target, relation)
 EdgeId: TypeAlias = tuple[str, str, str | None]
 GraphEntity: TypeAlias = str | EdgeId
 
@@ -82,8 +83,8 @@ class IndexType(BaseEnum):
 class EdgeType(BaseEnum):
     """Defines how edges are handled in the graph database.
 
-    INDIRECT: Defined as a collection with indexes, may be used after data ingestion
-    DIRECT: In addition to indexes, these edges are generated during ingestion
+    INDIRECT: Uses pre-existing DB structures and may be used after data ingestion
+    DIRECT: Generated during ingestion from resource pipelines
     """
 
     INDIRECT = "indirect"
@@ -250,7 +251,7 @@ class GraphContainer(ConfigBaseModel):
         """Iterate over edges matching the given edge definition.
 
         Args:
-            edge_def: Tuple of (source, target, optional_purpose)
+            edge_def: Tuple of (source, target, optional_relation)
 
         Returns:
             Generator yielding matching edge IDs

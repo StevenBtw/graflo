@@ -391,6 +391,90 @@ def test_transform_payload_consumption_avoids_cross_vertex_self_edge():
     ]
 
 
+def test_infer_edge_only_filters_greedy_edges():
+    vc = VertexConfig.from_dict(
+        {
+            "vertices": [
+                {"name": "a", "fields": ["id"], "identity": ["id"]},
+                {"name": "b", "fields": ["id"], "identity": ["id"]},
+                {"name": "c", "fields": ["id"], "identity": ["id"]},
+            ]
+        }
+    )
+    ec = EdgeConfig.from_dict(
+        {
+            "edges": [
+                {"source": "a", "target": "b", "relation": "ab"},
+                {"source": "a", "target": "c", "relation": "ac"},
+            ]
+        }
+    )
+    pipeline = [
+        {"vertex": "a"},
+        {"target_vertex": "a", "map": {"a": "id"}},
+        {"vertex": "b"},
+        {"target_vertex": "b", "map": {"b": "id"}},
+        {"vertex": "c"},
+        {"target_vertex": "c", "map": {"c": "id"}},
+    ]
+
+    anw = ActorWrapper(pipeline=pipeline)
+    anw.finish_init(
+        vertex_config=vc,
+        edge_config=ec,
+        transforms={},
+        infer_edge_only={("a", "b", None)},
+    )
+    ctx = ActionContext()
+    ctx = anw(ctx, doc={"a": "1", "b": "2", "c": "3"})
+    acc = anw.assemble(ctx)
+
+    assert len(acc[("a", "b", "ab")]) == 1
+    assert ("a", "c", "ac") not in acc
+
+
+def test_infer_edge_except_filters_greedy_edges():
+    vc = VertexConfig.from_dict(
+        {
+            "vertices": [
+                {"name": "a", "fields": ["id"], "identity": ["id"]},
+                {"name": "b", "fields": ["id"], "identity": ["id"]},
+                {"name": "c", "fields": ["id"], "identity": ["id"]},
+            ]
+        }
+    )
+    ec = EdgeConfig.from_dict(
+        {
+            "edges": [
+                {"source": "a", "target": "b", "relation": "ab"},
+                {"source": "a", "target": "c", "relation": "ac"},
+            ]
+        }
+    )
+    pipeline = [
+        {"vertex": "a"},
+        {"target_vertex": "a", "map": {"a": "id"}},
+        {"vertex": "b"},
+        {"target_vertex": "b", "map": {"b": "id"}},
+        {"vertex": "c"},
+        {"target_vertex": "c", "map": {"c": "id"}},
+    ]
+
+    anw = ActorWrapper(pipeline=pipeline)
+    anw.finish_init(
+        vertex_config=vc,
+        edge_config=ec,
+        transforms={},
+        infer_edge_except={("a", "c", None)},
+    )
+    ctx = ActionContext()
+    ctx = anw(ctx, doc={"a": "1", "b": "2", "c": "3"})
+    acc = anw.assemble(ctx)
+
+    assert len(acc[("a", "b", "ab")]) == 1
+    assert ("a", "c", "ac") not in acc
+
+
 def test_extraction_context_records_observations(
     resource_openalex_works, schema_vc_openalex
 ):

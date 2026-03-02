@@ -1727,6 +1727,21 @@ class TigerGraphConnection(Connection):
 
         return ",\n".join(attr_parts)
 
+    def _edge_identity_discriminator_fields(self, edge: Edge) -> set[str]:
+        """Return TigerGraph discriminator fields from logical edge identities."""
+        fields: set[str] = set()
+        for identity_key in edge.identities:
+            for token in identity_key:
+                if token in {"source", "target"}:
+                    continue
+                if token == "relation":
+                    if edge.relation_field is not None:
+                        fields.add(edge.relation_field)
+                    continue
+                if token not in {"_from", "_to"}:
+                    fields.add(token)
+        return fields
+
     def _get_edge_add_statement(self, edge: Edge) -> str:
         """Generate ADD DIRECTED EDGE statement for a schema change job.
 
@@ -1736,19 +1751,8 @@ class TigerGraphConnection(Connection):
         Returns:
             str: GSQL ADD DIRECTED EDGE statement
         """
-        # TigerGraph requires discriminators to support multiple edges of the same type
-        # between the same pair of vertices. We add discriminators for all indexed fields.
-        # Collect all indexed fields from edge.indexes
-        indexed_field_names = set()
-        for index in edge.indexes:
-            for field_name in index.fields:
-                # Skip special fields like "_from", "_to" which are ArangoDB-specific
-                if field_name not in ["_from", "_to"]:
-                    indexed_field_names.add(field_name)
-
-        # Also include relation_field if it's set (for backward compatibility)
-        if edge.relation_field and edge.relation_field not in indexed_field_names:
-            indexed_field_names.add(edge.relation_field)
+        # TigerGraph discriminators are derived from logical edge identity.
+        indexed_field_names = self._edge_identity_discriminator_fields(edge)
 
         # IMPORTANT: In TigerGraph, discriminator fields MUST also be edge attributes.
         # If an indexed field is not in weights.direct, we need to add it.
@@ -1816,8 +1820,8 @@ class TigerGraphConnection(Connection):
             )
         else:
             logger.debug(
-                f"No indexed fields found for edge {relation_db}. "
-                f"Indexes: {[idx.fields for idx in edge.indexes]}, "
+                f"No identity discriminator fields found for edge {relation_db}. "
+                f"Identities: {edge.identities}, "
                 f"relation_field: {edge.relation_field}"
             )
 
@@ -1859,18 +1863,8 @@ class TigerGraphConnection(Connection):
         first_edge = edges[0]
         relation = first_edge.relation_dbname
 
-        # Collect indexed fields for discriminator (same logic as _get_edge_add_statement)
-        indexed_field_names = set()
-        for index in first_edge.indexes:
-            for field_name in index.fields:
-                if field_name not in ["_from", "_to"]:
-                    indexed_field_names.add(field_name)
-
-        if (
-            first_edge.relation_field
-            and first_edge.relation_field not in indexed_field_names
-        ):
-            indexed_field_names.add(first_edge.relation_field)
+        # Collect identity discriminator fields (same logic as _get_edge_add_statement)
+        indexed_field_names = self._edge_identity_discriminator_fields(first_edge)
 
         # Ensure indexed fields are in weights (same logic as _get_edge_add_statement)
         if first_edge.weights is None:
@@ -2575,7 +2569,10 @@ class TigerGraphConnection(Connection):
         """
         for edge in edges:
             index_list = (
-                schema.database_features.edge_secondary_indexes(edge.edge_id)
+                schema.database_features.edge_secondary_indexes(
+                    edge.edge_id,
+                    logical_relation=edge.relation,
+                )
                 if schema is not None
                 else []
             )
@@ -2586,9 +2583,6 @@ class TigerGraphConnection(Connection):
                     f"TigerGraph does not support indexes on edge attributes. "
                     f"Only vertex indexes are supported."
                 )
-                # Skip edge index creation - TigerGraph doesn't support it
-                # for index_obj in edge.indexes:
-                #     self._add_index(edge.relation, index_obj, is_vertex_index=False)
 
     def _add_index(self, obj_name, index: Index, is_vertex_index=True):
         """

@@ -5,9 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.5] - 2026-02-28
+## [1.6.5] - 2026-03-02
 
 ### Changed
+- **Manifold edge identity model**:
+  - `Edge` now uses `identities` (list of identity keys) instead of singular `identity`
+  - Omitted/empty `identities` is permissive by default (multiple edges allowed)
+  - Each declared identity key compiles into a unique physical index/constraint candidate
+  - TigerGraph discriminator generation now derives from `edge.identities`
+- **Edge identifier layering**:
+  - `EdgeId` is relation-based: `(source, target, relation)`
+  - `purpose` is no longer part of logical edge identity; it is treated as DB-only physical metadata
+  - Runtime edge config maps and adapter lookups are aligned to relation-specific edge identity
+- **Physical edge indexing is centralized in `database_features`**:
+  - Identity-derived edge indexes are compiled into `Schema.database_features.edge_indexes`
+  - `edge_indexes` entries support `logical_relation` to disambiguate multiple relations sharing the same edge definition
+  - Edge index lookups in DB adapters are relation-aware
+- **Edge physical spec unification**:
+  - `database_features.edge_names` + `database_features.edge_indexes` were unified as `database_features.edge_specs`
+  - Purpose-scoped edge copies now inherit base indexes by default (`indexes_mode: inherit|append|replace`)
+  - Arango edge `graph_name` is aligned with derived `storage_name`
+  - `Edge.aux` is no longer a behavior switch
+- **Resource inferred-edge controls**:
+  - Added `resource.infer_edge_only` and `resource.infer_edge_except` selectors for fine-grained control of greedy/inferred edge emission
+  - Added validation for contradictions (`infer_edge_only` and `infer_edge_except` are mutually exclusive)
+  - Added validation that infer selectors reference existing schema edges
+
+### Breaking
+- Schemas that still define `edge.indexes` under `edge_config.edges[*]` now fail validation.
+- Migrate by moving physical edge specs/indexes to `database_features.edge_specs` and logical uniqueness keys to `edge.identities`.
+- `database_features.edge_variants` was renamed to `database_features.edge_specs`.
+
+### Changed (earlier in 1.6.5 cycle)
 - **Architecture phase separation**:
   - Runtime flow is now explicitly split into extraction and assembly contexts (`ExtractionContext`, `AssemblyContext`)
   - Actor orchestration was separated from wrapper structure by introducing `ActorExecutor`
@@ -17,12 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pipelines using transform/map steps without `target_vertex` now require explicit `vertex` steps
   - Test schemas depending on implicit behavior were migrated to explicit vertex declarations
 
-### Added
+### Added (earlier in 1.6.5 cycle)
 - **Typed extraction artifacts**:
   - Added `VertexObservation`, `TransformObservation`, `EdgeIntent`, and `ProvenancePath`
   - Added regression tests for new context/artifact APIs in `test/architecture/test_onto.py`
 
-### Documentation
+### Documentation (earlier in 1.6.5 cycle)
 - Updated schema authoring docs to use canonical `infer_edges` naming and describe explicit vertex requirements for transform outputs
 - Added concepts documentation for the extraction/assembly runtime split and `ActorExecutor` ownership
 

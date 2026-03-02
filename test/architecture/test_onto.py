@@ -30,7 +30,9 @@ def test_extraction_context_record_helpers():
         vertex={"id": "a"},
         ctx={"full_name": "A"},
     )
-    ctx.record_edge_intent(edge={"source": "author", "target": "paper"}, location=lindex)
+    ctx.record_edge_intent(
+        edge={"source": "author", "target": "paper"}, location=lindex
+    )
 
     assert len(ctx.transform_observations) == 1
     assert len(ctx.vertex_observations) == 1

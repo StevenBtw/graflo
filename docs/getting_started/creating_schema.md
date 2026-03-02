@@ -84,22 +84,24 @@ edge_config:
   edges:
     - source: person
       target: department
-      # optional: relation, match_source, match_target, weights, indexes, etc.
+      # optional: relation, identities, match_source, match_target, weights, etc.
 ```
 
 ### Edge fields
 
 - **`source`**, **`target`**: Required. Vertex type names (must exist in `vertex_config.vertices`).
 - **`relation`**: Optional. Relationship/edge type name (especially for Neo4j). For ArangoDB can be used as weight.
+- **`identities`**: Optional. List of logical edge identity keys.
+  - Each key is a list of fields/tokens, e.g. `[[source, target, relation, pub_id]]`.
+  - If omitted or empty, edge multiplicity is permissive (multiple edges allowed).
+  - If provided, each key is compiled to a unique physical constraint/index candidate.
 - **`relation_field`**: Optional. Field name that stores or reads the relation type (e.g. for TigerGraph).
 - **`relation_from_key`**: Optional. If true, derive relation from the location key during ingestion (e.g. JSON key).
 - **`match_source`**, **`match_target`**: Optional. Fields used to match source/target vertices when creating edges.
 - **`weights`**: Optional. Weight/attribute configuration:
   - **`direct`**: List of field names or typed fields to attach directly to the edge (e.g. `["date", "weight"]` or `[{"name": "date", "type": "DATETIME"}]`).
   - **`vertices`**: List of vertex-based weight definitions.
-- **`purpose`**: Optional. Extra label for utility edges between the same vertex types.
 - **`type`**: Optional. `DIRECT` (default) or `INDIRECT`.
-- **`aux`**: Optional. If true, edge is created in DB but not used by graflo ingestion.
 - **`by`**: Optional. For `INDIRECT` edges: vertex type name used to define the edge.
 
 ## `resources` (focus)
@@ -108,15 +110,29 @@ edge_config:
 
 Use this optional section for physical DB features that are not part of logical graph identity.
 
+For DB-only edge physical separation (for example auxiliary collections in ArangoDB), use
+`database_features.edge_specs[*].purpose`.
+Declare the logical edge once in `edge_config`; then declare purpose-scoped DB copies under
+`database_features.edge_specs` (for example `tmp`, `redux`, `convolution`).
+Storage/graph names are derived deterministically from
+`(source_storage, target_storage, purpose)`.
+
+`exclude_edge_endpoints` is a legacy edge-index flag and should not be used for new schemas.
+Model logical uniqueness with `edge.identities` and DB-only secondary indexes with
+`database_features.edge_specs[*].indexes`.
+
 ```yaml
 database_features:
   vertex_indexes:
     person:
       - fields: [name]
-  edge_indexes:
+  edge_specs:
     - source: person
       target: department
+      relation: null
       purpose: null
+      logical_relation: null
+      indexes_mode: inherit
       indexes:
         - fields: [relation]
 ```
@@ -132,6 +148,10 @@ Resources define **how** each data stream is turned into vertices and edges. Eac
 - **`extra_weights`**: Optional. Additional edge weight configs for this resource.
 - **`types`**: Optional. Field name → Python type expression for casting during ingestion (e.g. `{"age": "int"}`, `{"amount": "float"}`, `{"created_at": "datetime"}`). Useful when input is string-only (CSV, JSON) and you need numeric or date values.
 - **`infer_edges`**: Optional. If true (default), infer edges from vertex population during assembly; if false, emit only edges explicitly declared as edge actors in the pipeline.
+- **`infer_edge_only`**: Optional list of edge selectors (`source`, `target`, optional `relation`) that are allowed for inferred edges.
+- **`infer_edge_except`**: Optional list of edge selectors to suppress for inferred edges.
+  - `infer_edge_only` and `infer_edge_except` are mutually exclusive.
+  - These selectors affect inferred edges only, not explicit edge actors in the resource pipeline.
 
 ### Actor steps in `apply` / `pipeline`
 
@@ -201,7 +221,7 @@ Each step is a dict. You can write steps in shorthand (e.g. `vertex: person`) or
        from: person
        to: department
    ```
-   You can add edge-specific `weights`, `indexes`, etc. in the step when needed.
+  You can add edge-specific `weights`, `identities`, etc. in the step when needed.
 
 4. **Descend step** — go into a nested key and run a sub-pipeline (or process all keys with `any_key`):
    ```yaml
@@ -282,12 +302,10 @@ vertex_config:
   vertices:
     - name: person
       fields: [id, name, age]
-      indexes:
-        - fields: [id]
+      identity: [id]
     - name: department
       fields: [name]
-      indexes:
-        - fields: [name]
+      identity: [name]
 
 edge_config:
   edges:

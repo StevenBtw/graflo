@@ -40,6 +40,7 @@ from graflo.architecture.base import ConfigBaseModel
 from graflo.architecture.edge import Edge, EdgeConfig
 from graflo.architecture.executor import ActorExecutor
 from graflo.architecture.onto import (
+    EdgeId,
     EncodingType,
     GraphEntity,
 )
@@ -76,6 +77,32 @@ def _resolve_type_caster(name: str) -> Callable[..., Any] | None:
             if callable(builtin_attr) and attr_name in _SAFE_TYPE_CASTERS:
                 return _SAFE_TYPE_CASTERS[attr_name]
     return None
+
+
+class EdgeInferSpec(ConfigBaseModel):
+    """Selector for controlling inferred edge emission."""
+
+    source: str = PydanticField(..., description="Edge source vertex name.")
+    target: str = PydanticField(..., description="Edge target vertex name.")
+    relation: str | None = PydanticField(
+        default=None,
+        description=(
+            "Optional relation discriminator. If omitted, selector applies to all relations "
+            "for (source, target)."
+        ),
+    )
+
+    @property
+    def edge_id(self) -> EdgeId:
+        return self.source, self.target, self.relation
+
+    def matches(self, edge_id: EdgeId) -> bool:
+        source, target, relation = edge_id
+        return (
+            self.source == source
+            and self.target == target
+            and (self.relation is None or self.relation == relation)
+        )
 
 
 class Resource(ConfigBaseModel):
@@ -125,6 +152,20 @@ class Resource(ConfigBaseModel):
             "If False, emit only edges explicitly declared as edge actors in the pipeline."
         ),
     )
+    infer_edge_only: list[EdgeInferSpec] = PydanticField(
+        default_factory=list,
+        description=(
+            "Optional allow-list for inferred edges. Applies only to inferred (greedy) edges, "
+            "not explicit edge actors."
+        ),
+    )
+    infer_edge_except: list[EdgeInferSpec] = PydanticField(
+        default_factory=list,
+        description=(
+            "Optional deny-list for inferred edges. Applies only to inferred (greedy) edges, "
+            "not explicit edge actors."
+        ),
+    )
 
     _root: ActorWrapper = PrivateAttr()
     _types: dict[str, Callable[..., Any]] = PrivateAttr(default_factory=dict)
@@ -152,7 +193,30 @@ class Resource(ConfigBaseModel):
         # Placeholders until schema binds real configs.
         object.__setattr__(self, "_vertex_config", VertexConfig(vertices=[]))
         object.__setattr__(self, "_edge_config", EdgeConfig())
+        self._validate_infer_edge_spec_policy()
         return self
+
+    def _validate_infer_edge_spec_policy(self) -> None:
+        if self.infer_edge_only and self.infer_edge_except:
+            raise ValueError(
+                "Resource infer_edge_only and infer_edge_except are mutually exclusive."
+            )
+
+    def _validate_infer_edge_spec_targets(self, edge_config: EdgeConfig) -> None:
+        known_edge_ids = {edge_id for edge_id, _ in edge_config.edges_items()}
+
+        def _validate_list(field_name: str, specs: list[EdgeInferSpec]) -> None:
+            unknown: list[EdgeId] = []
+            for spec in specs:
+                if not any(spec.matches(edge_id) for edge_id in known_edge_ids):
+                    unknown.append(spec.edge_id)
+            if unknown:
+                raise ValueError(
+                    f"Resource {field_name} contains unknown edge selectors: {unknown}"
+                )
+
+        _validate_list("infer_edge_only", self.infer_edge_only)
+        _validate_list("infer_edge_except", self.infer_edge_except)
 
     @property
     def vertex_config(self) -> VertexConfig:
@@ -206,6 +270,7 @@ class Resource(ConfigBaseModel):
         """Rebuild runtime actor initialization state from typed context."""
         object.__setattr__(self, "_vertex_config", vertex_config)
         object.__setattr__(self, "_edge_config", edge_config)
+        self._validate_infer_edge_spec_targets(edge_config)
 
         logger.debug("total resource actor count : %s", self.root.count())
         init_ctx = ActorInitContext(
@@ -213,6 +278,8 @@ class Resource(ConfigBaseModel):
             edge_config=edge_config,
             transforms=transforms,
             infer_edges=self.infer_edges,
+            infer_edge_only={spec.edge_id for spec in self.infer_edge_only},
+            infer_edge_except={spec.edge_id for spec in self.infer_edge_except},
         )
         self.root.finish_init(init_ctx=init_ctx)
 

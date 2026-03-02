@@ -1,7 +1,9 @@
 import logging
 
+import pytest
+
 from graflo.architecture.edge import Edge, EdgeConfig
-from graflo.architecture.onto import Index, Weight
+from graflo.architecture.onto import Weight
 from graflo.architecture.vertex import VertexConfig
 from graflo.onto import DBType
 
@@ -14,40 +16,45 @@ def test_weight_config_b(vertex_helper_b):
 
 
 def test_init_edge(edge_with_weights):
-    vc = Edge.from_dict(edge_with_weights)
-    assert vc.weights is not None and len(vc.weights.vertices) == 2
-    assert len(vc.indexes) == 0
+    edge = Edge.from_dict(edge_with_weights)
+    assert edge.weights is not None and len(edge.weights.vertices) == 2
+    assert edge.identities == []
 
 
-def test_index_a(index_a):
-    ci = Index.from_dict(index_a)
-    assert len(ci.fields) == 2
+def test_init_edge_with_explicit_identities():
+    edge = Edge.from_dict(
+        {
+            "source": "entity",
+            "target": "entity",
+            "identities": [["source", "target", "relation", "pub_id"]],
+            "weights": {"direct": ["pub_id"]},
+        }
+    )
+    assert edge.identities == [["source", "target", "relation", "pub_id"]]
 
 
-def test_init_edge_indexes(edge_indexes):
-    e = Edge.from_dict(edge_indexes)
-    assert len(e.indexes) == 2
-    assert e.purpose == "aux"
+def test_edge_rejects_legacy_indexes_field():
+    with pytest.raises(ValueError):
+        Edge.from_dict(
+            {
+                "source": "entity",
+                "target": "entity",
+                "indexes": [{"fields": ["pub_id"]}],
+            }
+        )
 
 
-def test_complement_edge_init(edge_indexes, vertex_config_kg):
+def test_edge_identities_require_declared_direct_fields(vertex_config_kg):
     vertex_config = VertexConfig.from_dict(vertex_config_kg)
-    e = Edge.from_dict(edge_indexes)
-    e.finish_init(vertex_config)
-    assert len(e.indexes) == 2
-
-
-def test_edge_with_vertex_index_init(edge_with_vertex_indexes, vertex_config_kg):
-    vertex_config = VertexConfig.from_dict(vertex_config_kg)
-    e = Edge.from_dict(edge_with_vertex_indexes)
-    e.finish_init(vertex_config)
-    assert e.indexes[0].fields == [
-        "_from",
-        "_to",
-        "publication@arxiv",
-        "publication@doi",
-    ]
-    assert e.indexes[1].fields == ["publication@_key"]
+    edge = Edge.from_dict(
+        {
+            "source": "entity",
+            "target": "entity",
+            "identities": [["source", "target", "relation", "pub_id"]],
+        }
+    )
+    with pytest.raises(ValueError, match="unknown identity fields"):
+        edge.finish_init(vertex_config)
 
 
 def test_edge_config(vertex_config_kg, edge_config_kg):
@@ -61,19 +68,27 @@ def test_edge_key(vertex_config_kg, edge_config_kg):
     vertex_config = VertexConfig.from_dict(vertex_config_kg)
     e = EdgeConfig.from_dict(edge_config_kg)
     e.finish_init(vertex_config)
-    assert True
+    first_edge = next(iter(e.edges_list(include_aux=True)))
+    assert first_edge.edge_id in e
 
 
-def test_edge_finish_init_is_idempotent(edge_with_vertex_indexes, vertex_config_kg):
+def test_edge_finish_init_is_idempotent(vertex_config_kg):
     vertex_config = VertexConfig.from_dict(vertex_config_kg)
-    e = Edge.from_dict(edge_with_vertex_indexes)
-    e.finish_init(vertex_config)
-    first_indexes = [list(index.fields) for index in e.indexes]
+    edge = Edge.from_dict(
+        {
+            "source": "entity",
+            "target": "entity",
+            "identities": [["source", "target", "relation", "pub_id"]],
+            "weights": {"direct": ["pub_id"]},
+        }
+    )
+    edge.finish_init(vertex_config)
+    first_identities = [list(key) for key in edge.identities]
 
-    e.finish_init(vertex_config)
-    second_indexes = [list(index.fields) for index in e.indexes]
+    edge.finish_init(vertex_config)
+    second_identities = [list(key) for key in edge.identities]
 
-    assert second_indexes == first_indexes
+    assert second_identities == first_identities
 
 
 def test_edge_finish_init_tigergraph_relation_artifacts_are_not_duplicated(
@@ -90,15 +105,7 @@ def test_edge_finish_init_tigergraph_relation_artifacts_are_not_duplicated(
 
     e.finish_init(vertex_config, db_flavor=DBType.TIGERGRAPH)
     first_direct_names = list(e.weights.direct_names if e.weights is not None else [])
-    first_relation_index_count = sum(
-        1 for index in e.indexes if e.relation_field in index.fields
-    )
-
     e.finish_init(vertex_config, db_flavor=DBType.TIGERGRAPH)
     second_direct_names = list(e.weights.direct_names if e.weights is not None else [])
-    second_relation_index_count = sum(
-        1 for index in e.indexes if e.relation_field in index.fields
-    )
 
     assert second_direct_names == first_direct_names
-    assert second_relation_index_count == first_relation_index_count

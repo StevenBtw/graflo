@@ -328,7 +328,10 @@ class NebulaConnection(Connection):
         for edge in edges:
             rel = edge.relation or f"{edge.source}_{edge.target}"
             index_list = (
-                schema.database_features.edge_secondary_indexes(edge.edge_id)
+                schema.database_features.edge_secondary_indexes(
+                    edge.edge_id,
+                    logical_relation=edge.relation,
+                )
                 if schema is not None
                 else []
             )

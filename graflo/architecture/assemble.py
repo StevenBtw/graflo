@@ -6,7 +6,7 @@ from typing import Any
 
 from graflo.architecture.actor_util import render_edge, render_weights
 from graflo.architecture.edge import EdgeConfig
-from graflo.architecture.onto import AssemblyContext, LocationIndex
+from graflo.architecture.onto import AssemblyContext, EdgeId, LocationIndex
 from graflo.architecture.vertex import VertexConfig
 from graflo.util.merge import merge_doc_basis
 
@@ -39,14 +39,44 @@ def _emit_edge_documents(
     return emitted
 
 
+def _matches_selector(selector: EdgeId, edge_id: EdgeId) -> bool:
+    ss, st, sr = selector
+    es, et, er = edge_id
+    return ss == es and st == et and (sr is None or sr == er)
+
+
+def _is_inference_allowed(
+    edge_id: EdgeId,
+    *,
+    infer_edge_only: set[EdgeId],
+    infer_edge_except: set[EdgeId],
+) -> bool:
+    if infer_edge_only and not any(
+        _matches_selector(selector, edge_id) for selector in infer_edge_only
+    ):
+        return False
+    if infer_edge_except and any(
+        _matches_selector(selector, edge_id) for selector in infer_edge_except
+    ):
+        return False
+    return True
+
+
 def assemble_edges(
     *,
     ctx: AssemblyContext,
     vertex_config: VertexConfig,
     edge_config: EdgeConfig,
     edge_greedy: bool,
+    infer_edge_only: set[EdgeId] | None = None,
+    infer_edge_except: set[EdgeId] | None = None,
 ) -> None:
     """Assemble all edge documents after extraction finishes."""
+    if infer_edge_only is None:
+        infer_edge_only = set()
+    if infer_edge_except is None:
+        infer_edge_except = set()
+
     emitted_pairs: set[tuple[str, str]] = set()
 
     explicit_requests: list[tuple[Any, LocationIndex | None]] = [
@@ -73,6 +103,12 @@ def assemble_edges(
     for edge_id, edge in edge_config.edges_items():
         s, t, _ = edge_id
         if (s, t) in emitted_pairs or s not in populated or t not in populated:
+            continue
+        if not _is_inference_allowed(
+            edge_id,
+            infer_edge_only=infer_edge_only,
+            infer_edge_except=infer_edge_except,
+        ):
             continue
         if _emit_edge_documents(
             ctx=ctx,

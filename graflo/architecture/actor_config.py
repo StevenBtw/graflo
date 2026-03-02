@@ -229,9 +229,6 @@ class EdgeActorConfig(EdgeBase):
     weights: dict[str, list[str]] | None = Field(
         default=None, description="Weight configuration"
     )
-    indexes: list[dict[str, Any]] | None = Field(
-        default=None, description="Index configuration"
-    )
 
     @model_validator(mode="before")
     @classmethod
@@ -364,6 +361,8 @@ _STEP_STRIP_KEYS = frozenset(
         "vertex_config",
         "edge_config",
         "infer_edges",
+        "infer_edge_only",
+        "infer_edge_except",
         "transforms",
         "resource_name",
     }

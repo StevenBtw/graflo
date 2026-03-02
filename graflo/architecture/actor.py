@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Type
@@ -49,6 +49,7 @@ from graflo.architecture.edge import Edge, EdgeConfig
 from graflo.architecture.onto import (
     ActionContext,
     AssemblyContext,
+    EdgeId,
     ExtractionContext,
     GraphEntity,
     LocationIndex,
@@ -91,6 +92,8 @@ class ActorInitContext:
     edge_config: EdgeConfig
     transforms: dict[str, ProtoTransform]
     infer_edges: bool = True
+    infer_edge_only: set[EdgeId] = field(default_factory=set)
+    infer_edge_except: set[EdgeId] = field(default_factory=set)
 
 
 class Actor(ABC):
@@ -1133,6 +1136,8 @@ class ActorWrapper:
         self.vertex_config = w.vertex_config
         self.edge_config = w.edge_config
         self.infer_edges = w.infer_edges
+        self.infer_edge_only = w.infer_edge_only
+        self.infer_edge_except = w.infer_edge_except
 
     def init_transforms(
         self, init_ctx: ActorInitContext | None = None, **kwargs: Any
@@ -1148,6 +1153,12 @@ class ActorWrapper:
                 edge_config=kwargs.get("edge_config", EdgeConfig()),
                 transforms=kwargs.get("transforms", {}),
                 infer_edges=kwargs.get("infer_edges", self.infer_edges),
+                infer_edge_only=set(
+                    kwargs.get("infer_edge_only", self.infer_edge_only)
+                ),
+                infer_edge_except=set(
+                    kwargs.get("infer_edge_except", self.infer_edge_except)
+                ),
             )
         self.actor.init_transforms(init_ctx)
 
@@ -1165,11 +1176,19 @@ class ActorWrapper:
                 edge_config=kwargs.get("edge_config", EdgeConfig()),
                 transforms=kwargs.get("transforms", {}),
                 infer_edges=kwargs.get("infer_edges", self.infer_edges),
+                infer_edge_only=set(
+                    kwargs.get("infer_edge_only", self.infer_edge_only)
+                ),
+                infer_edge_except=set(
+                    kwargs.get("infer_edge_except", self.infer_edge_except)
+                ),
             )
         self.actor.init_transforms(init_ctx)
         self.vertex_config = init_ctx.vertex_config
         self.edge_config = init_ctx.edge_config
         self.infer_edges = init_ctx.infer_edges
+        self.infer_edge_only = set(init_ctx.infer_edge_only)
+        self.infer_edge_except = set(init_ctx.infer_edge_except)
         self.actor.finish_init(init_ctx)
 
     def count(self):
@@ -1203,6 +1222,8 @@ class ActorWrapper:
         wrapper.vertex_config = VertexConfig(vertices=[])
         wrapper.edge_config = EdgeConfig()
         wrapper.infer_edges = True
+        wrapper.infer_edge_only = set()
+        wrapper.infer_edge_except = set()
         return wrapper
 
     @classmethod
@@ -1251,6 +1272,8 @@ class ActorWrapper:
             vertex_config=self.vertex_config,
             edge_config=self.edge_config,
             edge_greedy=self.infer_edges,
+            infer_edge_only=self.infer_edge_only,
+            infer_edge_except=self.infer_edge_except,
         )
 
         for vertex_name, dd in assembly_ctx.acc_vertex.items():

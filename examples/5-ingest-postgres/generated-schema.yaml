@@ -1,7 +1,6 @@
 edge_config:
     edges:
-    -   aux: false
-        relation: follows
+    -   relation: follows
         relation_from_key: false
         source: users
         target: users
@@ -11,8 +10,7 @@ edge_config:
             -   name: created_at
                 type: DATETIME
             vertices: []
-    -   aux: false
-        relation: purchases
+    -   relation: purchases
         relation_from_key: false
         source: users
         target: products

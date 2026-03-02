@@ -200,10 +200,8 @@ classDiagram
     class Vertex {
         +name: str
         +identity: list~str~
-        +indexes: list~Index~ (legacy/compat)
         +fields: list~Field~
         +filters: FilterExpression?
-        +dbname: str?
     }
 
     class Field {
@@ -219,7 +217,7 @@ classDiagram
     class Edge {
         +source: str
         +target: str
-        +indexes: list~str~
+        +identities: list~list~str~~
         +weights: WeightConfig?
         +relation: str?
         +relation_field: str?
@@ -408,13 +406,13 @@ The `Schema` is the single source of truth for the LPG structure. It encapsulate
 - Vertex and edge definitions with optional type information
 - Resource mappings
 - Data transformations
-- Index configurations
+- Identity and physical index configurations
 - Automatic schema inference from normalized PostgreSQL databases (3NF with PK/FK) or from OWL/RDFS ontologies
 
 ### Vertex
-A `Vertex` describes vertices and their database indexes. It supports:
- 
-- Single or compound indexes (e.g., `["first_name", "last_name"]` instead of `"full_name"`)
+A `Vertex` describes vertices and their logical identity. It supports:
+
+- Single or compound identity fields (e.g., `["first_name", "last_name"]` instead of `"full_name"`)
 - Property definitions with optional type information
   - Fields can be specified as strings (backward compatible) or typed `Field` objects
   - Supported types: `INT`, `FLOAT`, `BOOL`, `STRING`, `DATETIME`
@@ -423,12 +421,12 @@ A `Vertex` describes vertices and their database indexes. It supports:
 - Optional blank vertex configuration
 
 ### Edge
-An `Edge` describes edges and their database indexes. It allows:
+An `Edge` describes edges and their logical identities. It allows:
  
 - Definition at any level of a hierarchical document
 - Reliance on vertex principal index
 - Weight configuration using `direct` parameter (with optional type information)
-- Uniqueness constraints with respect to `source`, `target`, and `weight` fields
+- Optional uniqueness semantics through `identities` (multiple candidate keys are allowed)
 
 ### Edge Attributes and Configuration
 
@@ -437,7 +435,7 @@ Edges in graflo support a rich set of attributes that enable flexible relationsh
 #### Basic Attributes
 - **`source`**: Source vertex name (required)
 - **`target`**: Target vertex name (required)
-- **`indexes`**: List of database indexes for the edge
+- **`identities`**: Logical identity keys for the edge (each key can induce uniqueness)
 - **`weights`**: Optional weight configuration for edge properties
 
 #### Relationship Type Configuration 
@@ -455,8 +453,11 @@ Edges in graflo support a rich set of attributes that enable flexible relationsh
 - **`weights.target_fields`**: Fields from target vertex to use as weights (deprecated)
 
 #### Edge Behavior Control
-- **`aux`**: Whether this is an auxiliary edge (created in database, but not considered by graflo)
-- **`purpose`**: Additional identifier for utility edges between same vertex types
+- Edge physical variants should be modeled with `database_features.edge_specs[*].purpose`.
+- `Edge.aux` is no longer a behavior switch.
+
+> DB-only physical edge metadata (including `purpose`) is configured under
+> `database_features.edge_specs`, not on `Edge`.
 
 #### Matching and Filtering
 - **`match_source`**: Select source items from a specific branch of json
@@ -466,9 +467,9 @@ Edges in graflo support a rich set of attributes that enable flexible relationsh
 #### Advanced Configuration
 - **`type`**: Edge type (DIRECT or INDIRECT)
 - **`by`**: Vertex name for indirect edges
-- **`graph_name`**: Custom graph name (auto-generated if not specified)
 - **`database_name`**: Database-specific edge identifier (auto-generated if not specified)
   - For ArangoDB, this corresponds to the edge collection name
+  - Arango graph name is aligned with this storage name for each purpose variant
   - For TigerGraph, used as fallback identifier when relation is not specified
   - For Neo4j, unused (relation is used instead)
 
@@ -520,6 +521,13 @@ A `Resource` is the central abstraction that bridges data sources and the graph 
 - The actor pipeline for processing documents
 
 Because DataSources bind to Resources by name, the same transformation logic applies regardless of whether data arrives from a file, an API, a SQL table, or a SPARQL endpoint.
+
+Resource-level edge inference controls:
+- **`infer_edges`**: Global toggle for greedy/inferred edge emission during assembly.
+- **`infer_edge_only`**: Allow-list of inferred edges (`source`, `target`, optional `relation`).
+- **`infer_edge_except`**: Deny-list of inferred edges (`source`, `target`, optional `relation`).
+- `infer_edge_only` and `infer_edge_except` are mutually exclusive and validated against declared schema edges.
+- These controls apply to inferred edges only; explicit edge actors in the pipeline are still emitted.
 
 ### Actor
 An `Actor` describes how the current level of the document should be mapped/transformed to the property graph vertices and edges. There are four types that act on the provided document in this order:
@@ -625,13 +633,13 @@ resources:
 ## Key Features
 
 ### Schema & Abstraction
-- **Declarative LPG schema** — `Schema` defines vertices, edges, indexes, weights, and transforms in YAML or Python; the single source of truth for the graph structure.
+- **Declarative LPG schema** — `Schema` defines vertices, edges, identity rules, weights, and transforms in YAML or Python; the single source of truth for the graph structure.
 - **Database abstraction** — one schema, one API; database idiosyncrasies are handled by the `GraphContainer` (covariant graph representation).
 - **Resource abstraction** — each `Resource` is a reusable actor pipeline that maps raw records to graph elements, decoupled from data retrieval.
 - **DataSourceRegistry** — pluggable `AbstractDataSource` adapters (`FILE`, `SQL`, `API`, `SPARQL`, `IN_MEMORY`) bound to Resources by name.
 
 ### Schema Features
-- **Flexible Indexing** — compound indexes on vertices and edges.
+- **Flexible Identity + Indexing** — logical identity plus DB-specific secondary indexes.
 - **Typed Fields** — optional type information for vertex fields and edge weights (INT, FLOAT, STRING, DATETIME, BOOL).
 - **Hierarchical Edge Definition** — define edges at any level of nested documents.
 - **Weighted Edges** — configure edge weights from document fields or vertex properties with optional type information.
@@ -649,7 +657,7 @@ resources:
 - **Smart Caching**: Minimize redundant operations
 
 ## Best Practices
-1. Use compound indexes for frequently queried vertex properties
+1. Use compound identity fields for natural keys, and `database_features` indexes for query performance
 2. Leverage blank vertices for complex relationship modeling
 3. Define transforms at the schema level for reusability
 4. Configure appropriate batch sizes based on your data volume
