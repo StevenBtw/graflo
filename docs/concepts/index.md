@@ -22,11 +22,15 @@ The GraFlo pipeline transforms data through five stages:
 flowchart LR
     SI["<b>Source Instance</b><br/>File · SQL · SPARQL · API"]
     R["<b>Resource</b><br/>Actor Pipeline"]
+    EX["<b>Extraction</b><br/>Observations + Edge Intents"]
+    AS["<b>Assembly</b><br/>Graph Entity Materialization"]
     GS["<b>Graph Schema</b><br/>Vertex/Edge Definitions<br/>Identities · Transforms · DB Features"]
     GC["<b>GraphContainer</b><br/>Covariant Graph Representation"]
     DB["<b>Graph DB (LPG)</b><br/>ArangoDB · Neo4j · TigerGraph · Others"]
 
-    SI --> R --> GS --> GC --> DB
+    SI --> R --> EX --> AS --> GC --> DB
+    GS -. configures .-> R
+    GS -. constrains .-> AS
 ```
 
 
@@ -63,7 +67,10 @@ flowchart LR
         SQLDS[SQLDataSource]
     end
     subgraph pipeline [Shared Pipeline]
+        Sch[Schema]
         Res[Resource Pipeline]
+        Ex[Extraction Phase]
+        Asm[Assembly Phase]
         GC[GraphContainer]
         DBW[DBWriter]
     end
@@ -72,7 +79,9 @@ flowchart LR
     Fuseki --> SP --> SparqlDS --> Res
     Files --> FP --> FileDS --> Res
     PG --> TP --> SQLDS --> Res
-    Res --> GC --> DBW
+    Sch --> Res
+    Sch --> Asm
+    Res --> Ex --> Asm --> GC --> DBW
 ```
 
 - **Patterns** (`FilePattern`, `TablePattern`, `SparqlPattern`) describe *where* data comes from (file paths, SQL tables, SPARQL endpoints).
@@ -220,6 +229,7 @@ classDiagram
     class Resource {
         +name: str
         +root: ActorWrapper
+        +executor: ActorExecutor
         +finish_init(vertex_config, edge_config, transforms)
     }
 
@@ -228,6 +238,12 @@ classDiagram
         +children: list~ActorWrapper~
     }
     note for ActorWrapper "Recursive tree: each<br />child is an ActorWrapper"
+
+    class ActorExecutor {
+        +extract(doc) ExtractionContext
+        +assemble(extraction_ctx) dict
+        +assemble_result(extraction_ctx) GraphAssemblyResult
+    }
 
     class Actor {
         <<abstract>>
@@ -240,6 +256,23 @@ classDiagram
     class ProtoTransform {
         +name: str
     }
+
+    class ExtractionContext {
+        +acc_vertex: map
+        +buffer_transforms: map
+        +edge_intents: list~EdgeIntent~
+    }
+
+    class AssemblyContext {
+        +extraction: ExtractionContext
+        +acc_global: map
+    }
+
+    class VertexObservation
+    class TransformObservation
+    class EdgeIntent
+    class ProvenancePath
+    class GraphAssemblyResult
 
     class FilterExpression {
         +kind: leaf | composite
@@ -260,13 +293,27 @@ classDiagram
     Edge --> FilterExpression : filters
 
     Resource *-- ActorWrapper : root
+    Resource *-- ActorExecutor : runtime orchestration
     ActorWrapper --> Actor : actor
+    ActorExecutor ..> ExtractionContext : produces
+    ActorExecutor ..> AssemblyContext : consumes
+    ExtractionContext o-- VertexObservation
+    ExtractionContext o-- TransformObservation
+    ExtractionContext o-- EdgeIntent
+    EdgeIntent --> ProvenancePath
+    ActorExecutor ..> GraphAssemblyResult : produces
 
     Actor <|-- VertexActor
     Actor <|-- EdgeActor
     Actor <|-- TransformActor
     Actor <|-- DescendActor
 ```
+
+Runtime detail: resource processing now uses an explicit two-phase flow
+(`ExtractionContext` -> `AssemblyContext`). Extraction records typed artifacts
+(`VertexObservation`, `TransformObservation`, `EdgeIntent`), and assembly turns
+those artifacts into graph entities. Orchestration is owned by
+`ActorExecutor`, while `ActorWrapper` remains focused on actor tree behavior.
 
 ### Caster ingestion pipeline
 

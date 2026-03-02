@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.5] - 2026-02-28
+
+### Changed
+- **Architecture phase separation**:
+  - Runtime flow is now explicitly split into extraction and assembly contexts (`ExtractionContext`, `AssemblyContext`)
+  - Actor orchestration was separated from wrapper structure by introducing `ActorExecutor`
+  - Edge assembly consumes explicit edge intents in addition to compatibility fallback paths
+- **Pipeline explicitness tightened**:
+  - Implicit vertex actor auto-creation during descend initialization was removed
+  - Pipelines using transform/map steps without `target_vertex` now require explicit `vertex` steps
+  - Test schemas depending on implicit behavior were migrated to explicit vertex declarations
+
+### Added
+- **Typed extraction artifacts**:
+  - Added `VertexObservation`, `TransformObservation`, `EdgeIntent`, and `ProvenancePath`
+  - Added regression tests for new context/artifact APIs in `test/architecture/test_onto.py`
+
+### Documentation
+- Updated schema authoring docs to use canonical `infer_edges` naming and describe explicit vertex requirements for transform outputs
+- Added concepts documentation for the extraction/assembly runtime split and `ActorExecutor` ownership
+
 ## [1.6.4] - 2026-02-25
 
 ### Changed

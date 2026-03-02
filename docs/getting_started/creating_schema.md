@@ -131,7 +131,7 @@ Resources define **how** each data stream is turned into vertices and edges. Eac
 - **`merge_collections`**: Optional. List of collection names to merge when writing.
 - **`extra_weights`**: Optional. Additional edge weight configs for this resource.
 - **`types`**: Optional. Field name → Python type expression for casting during ingestion (e.g. `{"age": "int"}`, `{"amount": "float"}`, `{"created_at": "datetime"}`). Useful when input is string-only (CSV, JSON) and you need numeric or date values.
-- **`edge_greedy`**: Optional. If true (default), infer edges from vertex population; if false, emit only edges explicitly declared as edge actors in the pipeline.
+- **`infer_edges`**: Optional. If true (default), infer edges from vertex population during assembly; if false, emit only edges explicitly declared as edge actors in the pipeline.
 
 ### Actor steps in `apply` / `pipeline`
 
@@ -153,6 +153,9 @@ Each step is a dict. You can write steps in shorthand (e.g. `vertex: person`) or
        person_id: id
      target_vertex: department   # optional: send result to a vertex
    ```
+   If a transform/map step does **not** declare `target_vertex`, make sure the
+   pipeline also has explicit `vertex` steps to consume those transformed
+   fields. Recent architecture updates removed implicit vertex actor creation.
 
    **Direct output** (function result maps 1:1 to output fields):
    ```yaml
@@ -236,6 +239,18 @@ transforms:
 ```
 
 Resources refer to them with `name: keep_suffix_id` (and optional `params`, `input`, `output` overrides) in a transform step.
+
+## Runtime execution phases
+
+Resource execution is split into two explicit phases:
+
+1. **Extraction phase**: actors walk documents and emit typed observations
+   (vertex observations, transform observations, and edge intents).
+2. **Assembly phase**: observations are merged and materialized into final
+   graph entities (vertex collections and edge collections).
+
+This split keeps extraction logic separate from graph assembly behavior and
+improves debuggability of actor pipelines.
 
 ## Loading a schema
 
