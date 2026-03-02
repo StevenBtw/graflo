@@ -461,6 +461,7 @@ def resource_ticker():
             Date: t_obs
     -   map:
             ticker: oftic
+    -   vertex: ticker
     - vertex: feature
     """)
 

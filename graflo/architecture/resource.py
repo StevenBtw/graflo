@@ -38,8 +38,8 @@ from pydantic import AliasChoices, Field as PydanticField, PrivateAttr, model_va
 from graflo.architecture.actor import ActorInitContext, ActorWrapper
 from graflo.architecture.base import ConfigBaseModel
 from graflo.architecture.edge import Edge, EdgeConfig
+from graflo.architecture.executor import ActorExecutor
 from graflo.architecture.onto import (
-    ActionContext,
     EncodingType,
     GraphEntity,
 )
@@ -130,11 +130,13 @@ class Resource(ConfigBaseModel):
     _types: dict[str, Callable[..., Any]] = PrivateAttr(default_factory=dict)
     _vertex_config: VertexConfig = PrivateAttr()
     _edge_config: EdgeConfig = PrivateAttr()
+    _executor: ActorExecutor = PrivateAttr()
 
     @model_validator(mode="after")
     def _build_root_and_types(self) -> Resource:
         """Build root ActorWrapper and resolve safe cast functions."""
         object.__setattr__(self, "_root", ActorWrapper(*self.pipeline))
+        object.__setattr__(self, "_executor", ActorExecutor(self._root))
         object.__setattr__(self, "_types", {})
         for k, v in self.types.items():
             caster = _resolve_type_caster(v)
@@ -228,10 +230,9 @@ class Resource(ConfigBaseModel):
         Returns:
             defaultdict[GraphEntity, list]: Processed graph entities
         """
-        ctx = ActionContext()
-        ctx = self.root(ctx, doc=doc)
-        acc = self.root.assemble(ctx)
-        return acc
+        extraction_ctx = self._executor.extract(doc)
+        result = self._executor.assemble_result(extraction_ctx)
+        return result.entities
 
     def count(self) -> int:
         """Total number of actors in the resource pipeline."""

@@ -6,13 +6,13 @@ from typing import Any
 
 from graflo.architecture.actor_util import render_edge, render_weights
 from graflo.architecture.edge import EdgeConfig
-from graflo.architecture.onto import ActionContext, LocationIndex
+from graflo.architecture.onto import AssemblyContext, LocationIndex
 from graflo.architecture.vertex import VertexConfig
 from graflo.util.merge import merge_doc_basis
 
 
 def _merge_vertices_for_edge(
-    ctx: ActionContext, vertex_config: VertexConfig, source: str, target: str
+    ctx: AssemblyContext, vertex_config: VertexConfig, source: str, target: str
 ) -> None:
     for vname in (source, target):
         for lindex, vlist in ctx.acc_vertex[vname].items():
@@ -23,7 +23,7 @@ def _merge_vertices_for_edge(
 
 def _emit_edge_documents(
     *,
-    ctx: ActionContext,
+    ctx: AssemblyContext,
     vertex_config: VertexConfig,
     edge: Any,
     lindex: LocationIndex | None,
@@ -41,7 +41,7 @@ def _emit_edge_documents(
 
 def assemble_edges(
     *,
-    ctx: ActionContext,
+    ctx: AssemblyContext,
     vertex_config: VertexConfig,
     edge_config: EdgeConfig,
     edge_greedy: bool,
@@ -49,7 +49,13 @@ def assemble_edges(
     """Assemble all edge documents after extraction finishes."""
     emitted_pairs: set[tuple[str, str]] = set()
 
-    for edge, lindex in ctx.edge_requests:
+    explicit_requests: list[tuple[Any, LocationIndex | None]] = [
+        (intent.edge, intent.location) for intent in ctx.edge_intents
+    ]
+    if not explicit_requests:
+        explicit_requests = list(ctx.edge_requests)
+
+    for edge, lindex in explicit_requests:
         if _emit_edge_documents(
             ctx=ctx,
             vertex_config=vertex_config,
@@ -58,6 +64,7 @@ def assemble_edges(
         ):
             emitted_pairs.add((edge.source, edge.target))
     ctx.edge_requests = []
+    ctx.extraction.edge_intents = []
 
     if not edge_greedy:
         return

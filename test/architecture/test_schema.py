@@ -29,7 +29,7 @@ def test_schema_load(schema):
 def test_resource(schema):
     sd = schema("ibes")
     sr = Resource.from_dict(sd["resources"][0])
-    assert len(sr.root.actor.descendants) == 10
+    assert len(sr.root.actor.descendants) == 11
 
 
 def test_s(schema):

@@ -38,6 +38,7 @@ from typing import Any, Callable, Iterable
 from graflo.architecture.edge import Edge
 from graflo.architecture.onto import (
     ActionContext,
+    AssemblyContext,
     EdgeCastingType,
     LocationIndex,
     TransformPayload,
@@ -51,8 +52,8 @@ logger = logging.getLogger(__name__)
 
 
 def add_blank_collections(
-    ctx: ActionContext, vertex_conf: VertexConfig
-) -> ActionContext:
+    ctx: AssemblyContext | ActionContext, vertex_conf: VertexConfig
+) -> AssemblyContext | ActionContext:
     """Add blank collections for vertices that require them.
 
     This function creates blank collections for vertices marked as blank in the
@@ -174,7 +175,7 @@ def count_unique_by_position_variable(tuples_list, fillvalue=None):
 def render_edge(
     edge: Edge,
     vertex_config: VertexConfig,
-    ctx: ActionContext,
+    ctx: AssemblyContext | ActionContext,
     lindex: LocationIndex | None = None,
 ) -> defaultdict[str | None, list]:
     """Create edges between source and target vertices.

@@ -22,6 +22,7 @@ Example:
 
 from .database_features import DatabaseFeatures, EdgeIndexSpec
 from .edge import Edge, EdgeConfig
+from .executor import ActorExecutor
 from .onto import Index
 from .resource import Resource
 from .schema import Schema
@@ -33,6 +34,7 @@ __all__ = [
     "EdgeIndexSpec",
     "FieldType",
     "Index",
+    "ActorExecutor",
     "DatabaseFeatures",
     "Resource",
     "Schema",

@@ -264,6 +264,12 @@ class DescendActorConfig(ConfigBaseModel):
         normalized = normalize_actor_step(cast(dict[str, Any], data))
         return normalized if normalized.get("type") == "descend" else data
 
+    @model_validator(mode="after")
+    def validate_explicit_vertex_requirements(self) -> "DescendActorConfig":
+        # Untargeted transform steps may be resolved during runtime initialization
+        # when VertexConfig is available (identity-based vertex inference).
+        return self
+
 
 class VertexRouterActorConfig(ConfigBaseModel):
     """Configuration for a VertexRouterActor.
@@ -324,6 +330,32 @@ _actor_config_adapter: TypeAdapter[
     | DescendActorConfig
     | VertexRouterActorConfig
 )
+
+
+def _pipeline_contains_vertex(configs: list["ActorConfig"]) -> bool:
+    for cfg in configs:
+        if isinstance(cfg, VertexActorConfig):
+            return True
+        if isinstance(cfg, DescendActorConfig) and _pipeline_contains_vertex(
+            cfg.pipeline
+        ):
+            return True
+    return False
+
+
+def _pipeline_has_untargeted_transform(configs: list["ActorConfig"]) -> bool:
+    for cfg in configs:
+        if (
+            isinstance(cfg, TransformActorConfig)
+            and cfg.target_vertex is None
+            and bool(cfg.map)
+        ):
+            return True
+        if isinstance(cfg, DescendActorConfig) and _pipeline_has_untargeted_transform(
+            cfg.pipeline
+        ):
+            return True
+    return False
 
 
 # Keys to strip from step dicts (runtime or resource-level, not part of ActorConfig)

@@ -332,6 +332,7 @@ def test_infer_edges_are_emitted_only_during_assemble(
     anw.finish_init(vertex_config=vc_ticker, transforms={}, edge_config=ec_ticker)
     ctx = anw(ctx, doc=sample_ticker[0])
 
+    assert isinstance(ctx, ActionContext)
     assert all(not isinstance(k, tuple) for k in ctx.acc_global.keys())
 
     acc = anw.assemble(ctx)
@@ -388,3 +389,29 @@ def test_transform_payload_consumption_avoids_cross_vertex_self_edge():
     assert acc[("author", "researchField", "belongsTo")] == [
         ({"id": "309238221625"}, {"id": "32057259"}, {})
     ]
+
+
+def test_extraction_context_records_observations(
+    resource_openalex_works, schema_vc_openalex
+):
+    doc = {
+        "id": "https://openalex.org/A123",
+        "doi": "https://doi.org/10.1007/978-3-123",
+    }
+    anw = ActorWrapper(*resource_openalex_works)
+    anw.finish_init(
+        vertex_config=schema_vc_openalex, transforms={}, edge_config=EdgeConfig()
+    )
+
+    ctx = ActionContext()
+    ctx = anw(ctx, doc=doc)
+
+    assert len(ctx.vertex_observations) > 0
+    assert len(ctx.transform_observations) > 0
+    assert len(ctx.edge_intents) > 0
+    assert all(
+        obs.provenance.path == obs.location.path for obs in ctx.vertex_observations
+    )
+    assert all(
+        obs.provenance.path == obs.location.path for obs in ctx.transform_observations
+    )

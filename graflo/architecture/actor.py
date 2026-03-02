@@ -48,6 +48,8 @@ from graflo.architecture.assemble import assemble_edges
 from graflo.architecture.edge import Edge, EdgeConfig
 from graflo.architecture.onto import (
     ActionContext,
+    AssemblyContext,
+    ExtractionContext,
     GraphEntity,
     LocationIndex,
     TransformPayload,
@@ -103,8 +105,8 @@ class Actor(ABC):
 
     @abstractmethod
     def __call__(
-        self, ctx: ActionContext, lindex: LocationIndex, *nargs, **kwargs
-    ) -> ActionContext:
+        self, ctx: ExtractionContext, lindex: LocationIndex, *nargs, **kwargs
+    ) -> ExtractionContext:
         """Execute the actor's main processing logic.
 
         Args:
@@ -336,7 +338,7 @@ class VertexActor(Actor):
 
     def _process_transformed_items(
         self,
-        ctx: ActionContext,
+        ctx: ExtractionContext,
         lindex: LocationIndex,
         doc: dict[str, Any],
         vertex_keys: tuple[str, ...],
@@ -399,8 +401,8 @@ class VertexActor(Actor):
         return self._filter_and_aggregate_vertex_docs(extracted_docs, doc)
 
     def __call__(
-        self, ctx: ActionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
-    ) -> ActionContext:
+        self, ctx: ExtractionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
+    ) -> ExtractionContext:
         """Process vertex data.
 
         Args:
@@ -409,7 +411,7 @@ class VertexActor(Actor):
             **kwargs: Additional keyword arguments including 'doc'
 
         Returns:
-            ActionContext: Updated action context
+            ExtractionContext: Updated extraction context
         """
         doc: dict[str, Any] = kwargs.get("doc", {})
 
@@ -435,17 +437,16 @@ class VertexActor(Actor):
             agg, index_keys=tuple(self.vertex_config.index(self.name).fields)
         )
 
-        ctx.acc_vertex[self.name][lindex].extend(
-            [
-                VertexRep(
-                    vertex=m,
-                    ctx={
-                        q: w for q, w in doc.items() if not isinstance(w, (dict, list))
-                    },
-                )
-                for m in merged
-            ]
-        )
+        obs_ctx = {q: w for q, w in doc.items() if not isinstance(w, (dict, list))}
+        for m in merged:
+            vertex_rep = VertexRep(vertex=m, ctx=obs_ctx)
+            ctx.acc_vertex[self.name][lindex].append(vertex_rep)
+            ctx.record_vertex_observation(
+                vertex_name=self.name,
+                location=lindex,
+                vertex=vertex_rep.vertex,
+                ctx=vertex_rep.ctx,
+            )
         return ctx
 
     def references_vertices(self) -> set[str]:
@@ -500,8 +501,8 @@ class EdgeActor(Actor):
             )
 
     def __call__(
-        self, ctx: ActionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
-    ) -> ActionContext:
+        self, ctx: ExtractionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
+    ) -> ExtractionContext:
         """Process edge data.
 
         Args:
@@ -510,10 +511,11 @@ class EdgeActor(Actor):
             **kwargs: Additional keyword arguments
 
         Returns:
-            ActionContext: Updated action context
+            ExtractionContext: Updated extraction context
         """
 
         ctx.edge_requests.append((self.edge, lindex))
+        ctx.record_edge_intent(edge=self.edge, location=lindex)
         return ctx
 
     def references_vertices(self) -> set[str]:
@@ -668,8 +670,8 @@ class TransformActor(Actor):
         return TransformPayload.from_result(result)
 
     def __call__(
-        self, ctx: ActionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
-    ) -> ActionContext:
+        self, ctx: ExtractionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
+    ) -> ExtractionContext:
         """Apply transformation to input data.
 
         Args:
@@ -678,7 +680,7 @@ class TransformActor(Actor):
             **kwargs: Additional keyword arguments including 'doc'
 
         Returns:
-            ActionContext: Updated action context
+            ExtractionContext: Updated extraction context
 
         Raises:
             ValueError: If no document is provided
@@ -695,6 +697,7 @@ class TransformActor(Actor):
             ctx.buffer_transforms[lindex].append(_update_doc)
         else:
             ctx.buffer_vertex[self.target_vertex].append(_update_doc)
+        ctx.record_transform_observation(location=lindex, payload=_update_doc)
         return ctx
 
     def references_vertices(self) -> set[str]:
@@ -782,6 +785,53 @@ class DescendActor(Actor):
         wrappers = [ActorWrapper.from_config(c) for c in config.pipeline]
         return cls(key=config.key, any_key=config.any_key, _descendants=wrappers)
 
+    def _infer_vertex_descendants_from_transforms(
+        self, init_ctx: ActorInitContext
+    ) -> None:
+        """Infer implicit VertexActors from untargeted transform outputs.
+
+        This is used when a pipeline contains transform map steps without explicit
+        target vertices and no explicit vertex actors at the same level.
+        """
+        if any(isinstance(an.actor, VertexActor) for an in self.descendants):
+            return
+
+        transform_output_fields: set[str] = set()
+        for an in self.descendants:
+            if isinstance(an.actor, TransformActor) and an.actor.target_vertex is None:
+                transform_output_fields.update(str(k) for k in an.actor.t.map.keys())
+
+        if not transform_output_fields:
+            return
+
+        inferred_vertices: list[str] = []
+        for vertex_name in sorted(init_ctx.vertex_config.vertex_set):
+            identity_fields = {
+                str(field) for field in init_ctx.vertex_config.index(vertex_name).fields
+            }
+            if identity_fields and identity_fields.issubset(transform_output_fields):
+                inferred_vertices.append(vertex_name)
+
+        if not inferred_vertices:
+            return
+
+        existing_targets: set[str] = set()
+        for an in self.descendants:
+            existing_targets.update(
+                str(v) for v in an.actor.references_vertices() if v is not None
+            )
+        for vertex_name in inferred_vertices:
+            if vertex_name in existing_targets:
+                continue
+            self.add_descendant(
+                ActorWrapper.from_config(VertexActorConfig(vertex=vertex_name))
+            )
+            logger.debug(
+                "DescendActor: inferred implicit VertexActor(%s) from untargeted transform fields %s",
+                vertex_name,
+                sorted(transform_output_fields),
+            )
+
     def init_transforms(self, init_ctx: ActorInitContext) -> None:
         """Initialize transforms for all descendants.
 
@@ -791,32 +841,6 @@ class DescendActor(Actor):
         for an in self.descendants:
             an.init_transforms(init_ctx)
 
-    def _collect_transform_actors_with_target(
-        self, actor_wrappers: list[ActorWrapper]
-    ) -> list[TransformActor]:
-        """Recursively collect all TransformActors with target_vertex from actor wrappers.
-
-        Args:
-            actor_wrappers: List of ActorWrapper instances to search
-
-        Returns:
-            list[TransformActor]: List of TransformActors with target_vertex specified
-        """
-        result = []
-        for anw in actor_wrappers:
-            # Check current level TransformActors
-            if (
-                isinstance(anw.actor, TransformActor)
-                and anw.actor.target_vertex is not None
-            ):
-                result.append(anw.actor)
-            # Recursively check nested DescendActors (they're already initialized at this point)
-            elif isinstance(anw.actor, DescendActor):
-                result.extend(
-                    self._collect_transform_actors_with_target(anw.actor.descendants)
-                )
-        return result
-
     def finish_init(self, init_ctx: ActorInitContext) -> None:
         """Complete initialization of the descend actor and its descendants.
 
@@ -824,54 +848,10 @@ class DescendActor(Actor):
             init_ctx: Shared typed initialization context
         """
         self.vertex_config = init_ctx.vertex_config
+        self._infer_vertex_descendants_from_transforms(init_ctx)
 
         for an in self.descendants:
             an.finish_init(init_ctx)
-
-        # Count TransformActors with target_vertex at current level and below
-        # Use the helper method which safely traverses the tree after initialization
-        transform_actors_with_target = self._collect_transform_actors_with_target(
-            self.descendants
-        )
-        transform_targets = [t.target_vertex for t in transform_actors_with_target]
-
-        available_fields = set()
-        for anw in self.descendants:
-            actor = anw.actor
-            if isinstance(actor, TransformActor):
-                available_fields |= set(list(actor.t.output))
-
-        present_vertices = [
-            anw.actor.name
-            for anw in self.descendants
-            if isinstance(anw.actor, VertexActor)
-        ]
-
-        for v in present_vertices:
-            available_fields -= set(self.vertex_config.fields_names(v))
-
-        for v in self.vertex_config.vertex_list:
-            # Use field_names property for cleaner set operations
-            v_field_names = set(v.field_names)
-            intersection = available_fields & v_field_names
-            # If there are 2+ TransformActors with target_vertex, don't auto-create VertexActors
-            skip_vertex = len(transform_targets) >= 2
-            if intersection and v.name not in present_vertices:
-                if not skip_vertex or (v.name in transform_targets and skip_vertex):
-                    new_descendant = ActorWrapper.from_config(
-                        VertexActorConfig(vertex=v.name)
-                    )
-                    new_descendant.finish_init(init_ctx)
-                    self.add_descendant(new_descendant)
-
-        logger.debug(
-            f"""type, priority: {
-                [
-                    (t.__name__, _NodeTypePriority[t])
-                    for t in (type(x.actor) for x in self.descendants)
-                ]
-            }"""
-        )
 
     def _expand_document(self, doc: dict | list) -> list[tuple[str | None, Any]]:
         """Expand document into list of (key, item) tuples for processing.
@@ -903,8 +883,8 @@ class DescendActor(Actor):
             return [(None, doc)]
 
     def __call__(
-        self, ctx: ActionContext, lindex: LocationIndex, *nargs, **kwargs: Any
-    ) -> ActionContext:
+        self, ctx: ExtractionContext, lindex: LocationIndex, *nargs, **kwargs: Any
+    ) -> ExtractionContext:
         """Process hierarchical data structure.
 
         Args:
@@ -912,7 +892,7 @@ class DescendActor(Actor):
             **kwargs: Additional keyword arguments including 'doc'
 
         Returns:
-            ActionContext: Updated action context
+            ExtractionContext: Updated extraction context
 
         Raises:
             ValueError: If no document is provided
@@ -1076,8 +1056,8 @@ class VertexRouterActor(Actor):
         return doc
 
     def __call__(
-        self, ctx: ActionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
-    ) -> ActionContext:
+        self, ctx: ExtractionContext, lindex: LocationIndex, *nargs: Any, **kwargs: Any
+    ) -> ExtractionContext:
         """Route the document to the matching VertexActor.
 
         Args:
@@ -1086,7 +1066,7 @@ class VertexRouterActor(Actor):
             **kwargs: Must contain ``doc``.
 
         Returns:
-            Updated ActionContext.
+            Updated extraction context.
         """
         doc: dict[str, Any] = kwargs.get("doc", {})
         vtype = doc.get(self.type_field)
@@ -1233,11 +1213,11 @@ class ActorWrapper:
 
     def __call__(
         self,
-        ctx: ActionContext,
+        ctx: ExtractionContext,
         lindex: LocationIndex = LocationIndex(),
         *nargs: Any,
         **kwargs: Any,
-    ) -> ActionContext:
+    ) -> ExtractionContext:
         """Execute the wrapped actor.
 
         Args:
@@ -1251,24 +1231,29 @@ class ActorWrapper:
         ctx = self.actor(ctx, lindex, *nargs, **kwargs)
         return ctx
 
-    def assemble(self, ctx: ActionContext) -> defaultdict[GraphEntity, list]:
+    def assemble(
+        self, ctx: ExtractionContext | AssemblyContext | ActionContext
+    ) -> defaultdict[GraphEntity, list]:
         """Assemble final graph entities from extracted context.
 
         Args:
-            ctx: Action context to normalize
+            ctx: Extraction or assembly context
 
         Returns:
-            defaultdict[GraphEntity, list]: Normalized context
+            defaultdict[GraphEntity, list]: Assembled graph entities
         """
-
+        if isinstance(ctx, AssemblyContext):
+            assembly_ctx = ctx
+        else:
+            assembly_ctx = AssemblyContext.from_extraction(ctx)
         assemble_edges(
-            ctx=ctx,
+            ctx=assembly_ctx,
             vertex_config=self.vertex_config,
             edge_config=self.edge_config,
             edge_greedy=self.infer_edges,
         )
 
-        for vertex_name, dd in ctx.acc_vertex.items():
+        for vertex_name, dd in assembly_ctx.acc_vertex.items():
             for lindex, vertex_list in dd.items():
                 vertex_list = [x.vertex for x in vertex_list]
                 vertex_list_updated = merge_doc_basis(
@@ -1277,11 +1262,14 @@ class ActorWrapper:
                 )
                 vertex_list_updated = pick_unique_dict(vertex_list_updated)
 
-                ctx.acc_global[vertex_name] += vertex_list_updated
+                assembly_ctx.acc_global[vertex_name] += vertex_list_updated
 
-        ctx = add_blank_collections(ctx, self.vertex_config)
+        assembly_ctx = add_blank_collections(assembly_ctx, self.vertex_config)
 
-        return ctx.acc_global
+        if isinstance(ctx, ActionContext):
+            ctx.acc_global = assembly_ctx.acc_global
+            return ctx.acc_global
+        return assembly_ctx.acc_global
 
     @classmethod
     def from_dict(cls, data: dict | list):
