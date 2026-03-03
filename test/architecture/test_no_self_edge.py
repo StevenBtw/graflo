@@ -112,7 +112,9 @@ def test_0xffff_no_spurious_self_edge(schema_debian_eco):
     ]
 
     # 0xffff must not have a self-edge
-    self_edges = [(u, v) for u, v in package_edges if u.get("name") == v.get("name") == "0xffff"]
+    self_edges = [
+        (u, v) for u, v in package_edges if u.get("name") == v.get("name") == "0xffff"
+    ]
     assert len(self_edges) == 0, (
         f"Expected no self-edge for package 0xffff, got {len(self_edges)}: {self_edges}"
     )
@@ -139,7 +141,9 @@ def test_bugs_0ad_no_spurious_package_self_edge(schema_debian_eco):
     ]
 
     # 0ad must not have a self-edge
-    self_edges = [(u, v) for u, v in package_edges if u.get("name") == v.get("name") == "0ad"]
+    self_edges = [
+        (u, v) for u, v in package_edges if u.get("name") == v.get("name") == "0ad"
+    ]
     assert len(self_edges) == 0, (
         f"Expected no self-edge for package 0ad from bugs resource, got {len(self_edges)}: {self_edges}"
     )
