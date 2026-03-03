@@ -1,4 +1,4 @@
-from graflo.architecture.actor import ActorWrapper
+from graflo.architecture.actor import ActorInitContext, ActorWrapper
 from graflo.architecture.edge import EdgeConfig
 from graflo.architecture.executor import ActorExecutor
 from graflo.architecture.onto import (
@@ -55,7 +55,13 @@ def test_actor_executor_assemble_result_returns_graph_result():
     ec = EdgeConfig.from_dict({"edges": []})
 
     wrapper = ActorWrapper(pipeline=[{"vertex": "author"}])
-    wrapper.finish_init(vertex_config=vc, edge_config=ec, transforms={})
+    wrapper.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vc,
+            edge_config=ec,
+            transforms={},
+        )
+    )
     executor = ActorExecutor(wrapper)
 
     extraction = executor.extract({"id": "42"})

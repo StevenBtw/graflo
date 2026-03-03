@@ -5,9 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [1.6.5] - 2026-03-02
 
 ### Changed
+- **Vertex identity indexes**: Neo4j, Memgraph, and FalkorDB now automatically create identity indexes in `define_vertex_indexes` when schema is provided. Previously, identity had to be manually added to `database_features.vertex_indexes`.
+- **Index naming**: All index-related method names and docstrings now use "indexes" instead of "indices".
 - **Logical vs DB-aware architecture split finalized**:
   - `Vertex`, `Edge`, `VertexConfig`, and `EdgeConfig` now remain logical/DB-agnostic
   - DB-specific naming/default/index projection is resolved via `Schema.resolve_db_aware(...)`
@@ -51,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Schemas that still define `edge.indexes` under `edge_config.edges[*]` now fail validation.
 - Migrate by moving physical edge specs/indexes to `database_features.edge_specs` and logical uniqueness keys to `edge.identities`.
 - `database_features.edge_variants` was renamed to `database_features.edge_specs`.
+- **Backend index documentation**: New `docs/concepts/backend_indexes.md` describing which backends have implicit vs explicit identity indexes and how `vertex_indexes` relates to identity.
+
 
 ### Breaking (vertex projection)
 - **Vertex projection replaces `target_vertex`**:

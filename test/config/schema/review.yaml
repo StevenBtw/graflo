@@ -5,9 +5,15 @@ database_features:
     vertex_storage_names:
         author: Author
         researchField: ResearchField
+    vertex_indexes:
+        author:
+        -   fields: [id, full_name]
+        researchField:
+        -   fields: [id]
     edge_indexes:
     -   source: author
         target: researchField
+        relation: belongsTo
         purpose:
         indexes:
         -   fields:

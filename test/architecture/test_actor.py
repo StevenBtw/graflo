@@ -1,6 +1,7 @@
 import logging
 
 from graflo.architecture.actor import (
+    ActorInitContext,
     ActorWrapper,
     DescendActor,
     EdgeActor,
@@ -22,7 +23,13 @@ logger = logging.getLogger(__name__)
 
 def test_descend(resource_descend, schema_vc_openalex):
     anw = ActorWrapper(**resource_descend)
-    anw.finish_init(vertex_config=schema_vc_openalex)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     assert isinstance(anw.actor, DescendActor)
     assert len(anw.actor.descendants) == 2
     assert isinstance(anw.actor.descendants[0].actor, DescendActor)
@@ -33,7 +40,11 @@ def test_descend(resource_descend, schema_vc_openalex):
 def test_edge(action_node_edge, schema_vc_openalex):
     anw = ActorWrapper(**action_node_edge)
     anw.finish_init(
-        transforms={}, vertex_config=schema_vc_openalex, edge_config=EdgeConfig()
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
     )
     assert isinstance(anw.actor, EdgeActor)
     assert anw.actor.edge.target == "work"
@@ -41,14 +52,26 @@ def test_edge(action_node_edge, schema_vc_openalex):
 
 def test_transform(action_node_transform, schema_vc_openalex):
     anw = ActorWrapper(**action_node_transform)
-    anw.finish_init(vertex_config=schema_vc_openalex)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     assert isinstance(anw.actor, TransformActor)
 
 
 def test_mapper_value(resource_concept, schema_vc_openalex):
     test_doc = [{"wikidata": "https://www.wikidata.org/wiki/Q123", "mag": 105794591}]
     anw = ActorWrapper(*resource_concept)
-    anw.finish_init(vertex_config=schema_vc_openalex, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     ctx = ActionContext()
     ctx = anw(ctx, doc=test_doc)
     assert len(ctx.acc_vertex) == 1
@@ -67,7 +90,13 @@ def test_transform_shortcut(resource_openalex_works, schema_vc_openalex):
     }
     anw = ActorWrapper(*resource_openalex_works)
     transforms = {}
-    anw.finish_init(vertex_config=schema_vc_openalex, transforms=transforms)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms=transforms,
+        )
+    )
     ctx = ActionContext()
     ctx = anw(ctx, doc=doc)
     assert ctx.acc_vertex["work"][LocationIndex(path=(0,))] == [
@@ -87,7 +116,13 @@ def test_edge_between_levels(
     ctx = ActionContext()
     anw = ActorWrapper(*resource_openalex_works)
     ec = EdgeConfig()
-    anw.finish_init(vertex_config=schema_vc_openalex, transforms={}, edge_config=ec)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=ec,
+            transforms={},
+        )
+    )
     ctx = anw(ctx, doc=sample_openalex)
     acc = anw.assemble(ctx)
     lindexes = list(ctx.acc_vertex["work"])
@@ -100,7 +135,13 @@ def test_edge_between_levels(
 
 def test_relation_from_key(resource_deb, data_deb, schema_vc_deb):
     anw = ActorWrapper(*resource_deb)
-    anw.finish_init(vertex_config=schema_vc_deb, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_deb,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     ctx = ActionContext()
     ctx = anw(ctx, doc=data_deb)
     acc = anw.assemble(ctx)
@@ -120,7 +161,13 @@ def test_relation_from_key(resource_deb, data_deb, schema_vc_deb):
 
 def test_relation_exclude_target(resource_deb, data_deb, schema_vc_deb):
     anw = ActorWrapper(*resource_deb)
-    anw.finish_init(vertex_config=schema_vc_deb, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_deb,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     ctx = ActionContext()
     ctx = anw(ctx, doc=data_deb)
     acc = anw.assemble(ctx)
@@ -129,7 +176,13 @@ def test_relation_exclude_target(resource_deb, data_deb, schema_vc_deb):
 
 def test_resource_deb_compact(resource_deb_compact, data_deb, schema_vc_deb):
     anw = ActorWrapper(*resource_deb_compact)
-    anw.finish_init(vertex_config=schema_vc_deb, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_deb,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     ctx = ActionContext()
     ctx = anw(ctx, doc=data_deb)
     acc = anw.assemble(ctx)
@@ -152,7 +205,13 @@ def test_relation_from_key_package_only(
 ):
     """Package-package edges only via relation_from_key (example 4 style). Nothing else."""
     anw = ActorWrapper(*resource_deb_package_only)
-    anw.finish_init(vertex_config=schema_vc_deb, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_deb,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     ctx = ActionContext()
     ctx = anw(ctx, doc=data_deb_relation_from_key)
     acc = anw.assemble(ctx)
@@ -179,7 +238,13 @@ def test_relation_from_key_package_only(
 def test_find_descendants_by_vertex_name(resource_descend, schema_vc_openalex):
     """find_descendants returns VertexActors whose name is in the given set."""
     anw = ActorWrapper(**resource_descend)
-    anw.finish_init(vertex_config=schema_vc_openalex)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     # Tree: DescendActor -> [DescendActor(apply with name "a"), VertexActor("work")]
     by_name_work = anw.find_descendants(actor_type=VertexActor, name={"work"})
     assert len(by_name_work) == 1
@@ -196,7 +261,13 @@ def test_find_descendants_by_type_and_predicate(
 ):
     """find_descendants with actor_type and custom predicate works on nested tree."""
     anw = ActorWrapper(*resource_openalex_works)
-    anw.finish_init(vertex_config=schema_vc_openalex, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     all_vertex_work = anw.find_descendants(actor_type=VertexActor, name={"work"})
     assert len(all_vertex_work) == 2  # top-level and under referenced_works
     assert all(
@@ -216,7 +287,13 @@ def test_find_descendants_vertex_by_from_doc(
 ):
     """find_descendants returns VertexActors whose from_doc matches."""
     anw = ActorWrapper(*resource_collision)
-    anw.finish_init(vertex_config=vertex_config_collision, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vertex_config_collision,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     by_vertex = anw.find_descendants(actor_type=VertexActor, name={"person"})
     assert len(by_vertex) >= 1
     with_from = [w for w in by_vertex if w.actor.from_doc]
@@ -234,7 +311,13 @@ def test_explicit_format_pipeline_vertex_from_create_edge():
         {"create_edge": {"from": "users", "to": "users"}},
     ]
     anw = ActorWrapper(pipeline=pipeline)
-    anw.finish_init(vertex_config=vc, transforms={}, edge_config=EdgeConfig())
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vc,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     assert isinstance(anw.actor, DescendActor)
     vertex_count = sum(
         1 for d in anw.actor.descendants if isinstance(d.actor, VertexActor)
@@ -281,7 +364,13 @@ def test_transform_tuple_output_maps_to_vertex_index_fields_in_order():
     )
     pipeline = [{"map": {"unused": "unused"}}, {"vertex": "pair"}]
     anw = ActorWrapper(pipeline=pipeline)
-    anw.finish_init(vertex_config=vc, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vc,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
 
     transform_wrappers = anw.find_descendants(actor_type=TransformActor)
     assert len(transform_wrappers) == 1
@@ -301,7 +390,13 @@ def test_transform_named_proto_binding_executes_with_registered_transform():
     transforms = {
         "to_int": ProtoTransform(name="to_int", module="builtins", foo="int", params={})
     }
-    anw.finish_init(vertex_config=VertexConfig(vertices=[]), transforms=transforms)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=VertexConfig(vertices=[]),
+            edge_config=EdgeConfig(),
+            transforms=transforms,
+        )
+    )
 
     transform_wrappers = anw.find_descendants(actor_type=TransformActor)
     assert len(transform_wrappers) == 1
@@ -316,7 +411,13 @@ def test_transform_named_proto_binding_executes_with_registered_transform():
 def test_multi_edges_from_row(resource_ticker, vc_ticker, ec_ticker, sample_ticker):
     ctx = ActionContext()
     anw = ActorWrapper(**resource_ticker)
-    anw.finish_init(vertex_config=vc_ticker, transforms={}, edge_config=ec_ticker)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vc_ticker,
+            edge_config=ec_ticker,
+            transforms={},
+        )
+    )
     ctx = anw(ctx, doc=sample_ticker[0])
 
     acc = anw.assemble(ctx)
@@ -333,7 +434,11 @@ def test_multi_edges_from_row_filtered(
     ctx = ActionContext()
     anw = ActorWrapper(**resource_ticker)
     anw.finish_init(
-        vertex_config=vc_ticker_filtered, transforms={}, edge_config=ec_ticker
+        init_ctx=ActorInitContext(
+            vertex_config=vc_ticker_filtered,
+            edge_config=ec_ticker,
+            transforms={},
+        )
     )
     ctx = anw(ctx, doc=sample_ticker[0])
 
@@ -347,7 +452,13 @@ def test_infer_edges_are_emitted_only_during_assemble(
 ):
     ctx = ActionContext()
     anw = ActorWrapper(**resource_ticker)
-    anw.finish_init(vertex_config=vc_ticker, transforms={}, edge_config=ec_ticker)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vc_ticker,
+            edge_config=ec_ticker,
+            transforms={},
+        )
+    )
     ctx = anw(ctx, doc=sample_ticker[0])
 
     assert isinstance(ctx, ActionContext)
@@ -399,7 +510,13 @@ def test_transform_payload_consumption_avoids_cross_vertex_self_edge():
         {"vertex": "researchField", "from": {"id": "research_sector"}},
     ]
     anw = ActorWrapper(pipeline=pipeline)
-    anw.finish_init(vertex_config=vc, edge_config=ec, transforms={})
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vc,
+            edge_config=ec,
+            transforms={},
+        )
+    )
 
     ctx = ActionContext()
     ctx = anw(ctx, doc=doc)
@@ -436,10 +553,12 @@ def test_infer_edge_only_filters_greedy_edges():
 
     anw = ActorWrapper(pipeline=pipeline)
     anw.finish_init(
-        vertex_config=vc,
-        edge_config=ec,
-        transforms={},
-        infer_edge_only={("a", "b", None)},
+        init_ctx=ActorInitContext(
+            vertex_config=vc,
+            edge_config=ec,
+            transforms={},
+            infer_edge_only={("a", "b", None)},
+        )
     )
     ctx = ActionContext()
     ctx = anw(ctx, doc={"a": "1", "b": "2", "c": "3"})
@@ -475,10 +594,12 @@ def test_infer_edge_except_filters_greedy_edges():
 
     anw = ActorWrapper(pipeline=pipeline)
     anw.finish_init(
-        vertex_config=vc,
-        edge_config=ec,
-        transforms={},
-        infer_edge_except={("a", "c", None)},
+        init_ctx=ActorInitContext(
+            vertex_config=vc,
+            edge_config=ec,
+            transforms={},
+            infer_edge_except={("a", "c", None)},
+        )
     )
     ctx = ActionContext()
     ctx = anw(ctx, doc={"a": "1", "b": "2", "c": "3"})
@@ -497,7 +618,11 @@ def test_extraction_context_records_observations(
     }
     anw = ActorWrapper(*resource_openalex_works)
     anw.finish_init(
-        vertex_config=schema_vc_openalex, transforms={}, edge_config=EdgeConfig()
+        init_ctx=ActorInitContext(
+            vertex_config=schema_vc_openalex,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
     )
 
     ctx = ActionContext()

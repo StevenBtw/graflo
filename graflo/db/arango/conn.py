@@ -13,7 +13,7 @@ Key Features:
 
     - Graph-based document organization
     - Vertex and edge class management
-    - Persistent, hash, skiplist, and fulltext indices
+    - Persistent, hash, skiplist, and fulltext indexes
     - Batch document and edge operations
     - AQL query generation and execution
 
@@ -453,7 +453,7 @@ class ArangoConnection(Connection):
     def _add_index(self, general_collection: Any, index: Index) -> Any | None:
         """Add an index to an ArangoDB collection.
 
-        Supports persistent, hash, skiplist, and fulltext indices.
+        Supports persistent, hash, skiplist, and fulltext indexes.
 
         Args:
             general_collection: ArangoDB collection to add index to
@@ -478,12 +478,13 @@ class ArangoConnection(Connection):
             )
         return ih
 
-    def define_vertex_indices(
+    def define_vertex_indexes(
         self, vertex_config: VertexConfig, schema: Schema | None = None
     ) -> None:
-        """Define indices for vertex collections.
+        """Define indexes for vertex collections.
 
-        Creates indices for each vertex collection based on the configuration.
+        Creates indexes for each vertex collection based on the configuration.
+        Identity index is created at collection creation; this adds secondary indexes only.
 
         Args:
             vertex_config: Vertex configuration containing index definitions
@@ -512,12 +513,12 @@ class ArangoConnection(Connection):
                 if tuple(index_obj.fields) not in field_combinations:
                     self._add_index(general_collection, index_obj)
 
-    def define_edge_indices(
+    def define_edge_indexes(
         self, edges: list[Edge], schema: Schema | None = None
     ) -> None:
-        """Define indices for edge collections.
+        """Define indexes for edge collections.
 
-        Creates indices for each edge collection based on the configuration.
+        Creates indexes for each edge collection based on the configuration.
 
         Args:
             edges: List of edge configurations containing index definitions
@@ -539,13 +540,13 @@ class ArangoConnection(Connection):
                     self._add_index(general_collection, index_obj)
 
     def fetch_indexes(self, db_class_name: str | None = None) -> dict[str, Any]:
-        """Fetch all indices from the database.
+        """Fetch all indexes from the database.
 
         Args:
-            db_class_name: Optional collection name to fetch indices for
+            db_class_name: Optional collection name to fetch indexes for
 
         Returns:
-            dict: Mapping of collection names to their indices
+            dict: Mapping of collection names to their indexes
         """
         classes: list[Any] = []
         if db_class_name is None:

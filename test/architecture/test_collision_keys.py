@@ -1,6 +1,7 @@
 import logging
 
-from graflo.architecture.actor import ActorWrapper
+from graflo.architecture.actor import ActorInitContext, ActorWrapper
+from graflo.architecture.edge import EdgeConfig
 from graflo.architecture.onto import ActionContext, LocationIndex, VertexRep
 
 logger = logging.getLogger(__name__)
@@ -9,7 +10,13 @@ logger = logging.getLogger(__name__)
 def test_collision(resource_collision, vertex_config_collision, sample_cross):
     ctx = ActionContext()
     anw = ActorWrapper(*resource_collision)
-    anw.finish_init(transforms={}, vertex_config=vertex_config_collision)
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=vertex_config_collision,
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
     ctx = anw(ctx, doc=sample_cross)
     assert ctx.acc_vertex["person"][LocationIndex(path=(0,))] == [
         VertexRep(vertex={"id": "John"}, ctx={"name": "John", "id": "Apple"}),

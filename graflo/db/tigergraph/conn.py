@@ -2585,12 +2585,12 @@ class TigerGraphConnection(Connection):
         # Handle TigerGraph-specific type aliases
         return TIGERGRAPH_TYPE_ALIASES.get(field_type_str, FieldType.STRING.value)
 
-    def define_vertex_indices(
+    def define_vertex_indexes(
         self, vertex_config: VertexConfig, schema: Schema | None = None
     ):
         """
         TigerGraph automatically indexes primary keys.
-        Secondary indices are less common but can be created.
+        Secondary indexes are less common but can be created.
         """
         db_vertex = (
             schema.resolve_db_aware(DBType.TIGERGRAPH).vertex_config
@@ -2609,8 +2609,8 @@ class TigerGraphConnection(Connection):
             for index_obj in index_list:
                 self._add_index(vertex_dbname, index_obj)
 
-    def define_edge_indices(self, edges: list[Edge], schema: Schema | None = None):
-        """Define indices for edges if specified.
+    def define_edge_indexes(self, edges: list[Edge], schema: Schema | None = None):
+        """Define indexes for edges if specified.
 
         Note: TigerGraph does not support creating indexes on edge attributes.
         Edge indexes are skipped with a warning. Only vertex indexes are supported.
@@ -4239,9 +4239,9 @@ class TigerGraphConnection(Connection):
     def define_indexes(self, schema: Schema):
         """Define all indexes from schema."""
         try:
-            self.define_vertex_indices(schema.vertex_config, schema=schema)
-            edges_for_indices = list(schema.edge_config.edges_list(include_aux=True))
-            self.define_edge_indices(edges_for_indices, schema=schema)
+            self.define_vertex_indexes(schema.vertex_config, schema=schema)
+            edges_for_indexes = list(schema.edge_config.edges_list(include_aux=True))
+            self.define_edge_indexes(edges_for_indexes, schema=schema)
         except Exception as e:
             logger.error(f"Error defining indexes: {e}")
 

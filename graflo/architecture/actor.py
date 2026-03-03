@@ -965,7 +965,7 @@ class VertexRouterActor(Actor):
         self.prefix = config.prefix
         self.field_map = config.field_map
         self._vertex_actors: dict[str, ActorWrapper] = {}
-        self._init_kwargs: dict[str, Any] = {}
+        self._init_ctx: ActorInitContext | None = None
         self.vertex_config: VertexConfig = VertexConfig(vertices=[])
 
     @classmethod
@@ -986,7 +986,7 @@ class VertexRouterActor(Actor):
     def finish_init(self, init_ctx: ActorInitContext) -> None:
         """Store initialization state for on-demand wrapper creation."""
         self.vertex_config = init_ctx.vertex_config
-        self._init_kwargs = {"init_ctx": init_ctx}
+        self._init_ctx = init_ctx
         self._vertex_actors.clear()
 
     def _get_or_create_wrapper(self, vertex_type: str) -> ActorWrapper | None:
@@ -996,8 +996,9 @@ class VertexRouterActor(Actor):
         if wrapper is not None:
             return wrapper
 
+        assert self._init_ctx is not None
         wrapper = ActorWrapper.from_config(VertexActorConfig(vertex=vertex_type))
-        wrapper.finish_init(**self._init_kwargs)
+        wrapper.finish_init(self._init_ctx)
         self._vertex_actors[vertex_type] = wrapper
         logger.debug(
             "VertexRouterActor: lazily registered VertexActor(%s) for type_field=%s",
@@ -1089,8 +1090,7 @@ class ActorWrapper:
 
     Attributes:
         actor: The wrapped actor instance
-        vertex_config: Vertex configuration
-        edge_config: Edge configuration
+        init_ctx: Typed initialization context (vertex_config, edge_config, etc.)
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -1106,62 +1106,45 @@ class ActorWrapper:
         config = parse_root_config(*args, **kwargs)
         w = ActorWrapper.from_config(config)
         self.actor = w.actor
-        self.vertex_config = w.vertex_config
-        self.edge_config = w.edge_config
-        self.infer_edges = w.infer_edges
-        self.infer_edge_only = w.infer_edge_only
-        self.infer_edge_except = w.infer_edge_except
+        self.init_ctx = w.init_ctx
 
-    def init_transforms(
-        self, init_ctx: ActorInitContext | None = None, **kwargs: Any
-    ) -> None:
+    @property
+    def vertex_config(self) -> VertexConfig:
+        return self.init_ctx.vertex_config
+
+    @property
+    def edge_config(self) -> EdgeConfig:
+        return self.init_ctx.edge_config
+
+    @property
+    def infer_edges(self) -> bool:
+        return self.init_ctx.infer_edges
+
+    @property
+    def infer_edge_only(self) -> set[EdgeId]:
+        return self.init_ctx.infer_edge_only
+
+    @property
+    def infer_edge_except(self) -> set[EdgeId]:
+        return self.init_ctx.infer_edge_except
+
+    def init_transforms(self, init_ctx: ActorInitContext) -> None:
         """Initialize transforms for the wrapped actor.
 
         Args:
             init_ctx: Shared typed initialization context
         """
-        if init_ctx is None:
-            init_ctx = ActorInitContext(
-                vertex_config=kwargs.get("vertex_config", VertexConfig(vertices=[])),
-                edge_config=kwargs.get("edge_config", EdgeConfig()),
-                transforms=kwargs.get("transforms", {}),
-                infer_edges=kwargs.get("infer_edges", self.infer_edges),
-                infer_edge_only=set(
-                    kwargs.get("infer_edge_only", self.infer_edge_only)
-                ),
-                infer_edge_except=set(
-                    kwargs.get("infer_edge_except", self.infer_edge_except)
-                ),
-            )
+        self.init_ctx = init_ctx
         self.actor.init_transforms(init_ctx)
 
-    def finish_init(
-        self, init_ctx: ActorInitContext | None = None, **kwargs: Any
-    ) -> None:
+    def finish_init(self, init_ctx: ActorInitContext) -> None:
         """Complete initialization of the wrapped actor.
 
         Args:
             init_ctx: Shared typed initialization context
         """
-        if init_ctx is None:
-            init_ctx = ActorInitContext(
-                vertex_config=kwargs.get("vertex_config", VertexConfig(vertices=[])),
-                edge_config=kwargs.get("edge_config", EdgeConfig()),
-                transforms=kwargs.get("transforms", {}),
-                infer_edges=kwargs.get("infer_edges", self.infer_edges),
-                infer_edge_only=set(
-                    kwargs.get("infer_edge_only", self.infer_edge_only)
-                ),
-                infer_edge_except=set(
-                    kwargs.get("infer_edge_except", self.infer_edge_except)
-                ),
-            )
+        self.init_ctx = init_ctx
         self.actor.init_transforms(init_ctx)
-        self.vertex_config = init_ctx.vertex_config
-        self.edge_config = init_ctx.edge_config
-        self.infer_edges = init_ctx.infer_edges
-        self.infer_edge_only = set(init_ctx.infer_edge_only)
-        self.infer_edge_except = set(init_ctx.infer_edge_except)
         self.actor.finish_init(init_ctx)
 
     def count(self):
@@ -1192,11 +1175,14 @@ class ActorWrapper:
             )
         wrapper = cls.__new__(cls)
         wrapper.actor = actor
-        wrapper.vertex_config = VertexConfig(vertices=[])
-        wrapper.edge_config = EdgeConfig()
-        wrapper.infer_edges = True
-        wrapper.infer_edge_only = set()
-        wrapper.infer_edge_except = set()
+        wrapper.init_ctx = ActorInitContext(
+            vertex_config=VertexConfig(vertices=[]),
+            edge_config=EdgeConfig(),
+            transforms={},
+            infer_edges=True,
+            infer_edge_only=set(),
+            infer_edge_except=set(),
+        )
         return wrapper
 
     @classmethod
