@@ -208,7 +208,7 @@ class RegistryBuilder:
 
         try:
             resource = self.schema.fetch_resource(resource_name)
-            if not pattern.joins:
+            if pattern.view is None and not pattern.joins:
                 enrich_edge_pattern_with_joins(
                     resource=resource,
                     pattern=pattern,

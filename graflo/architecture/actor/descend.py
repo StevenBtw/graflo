@@ -8,6 +8,11 @@ from typing import TYPE_CHECKING, Any, Type
 
 from graflo.architecture.actor.base import Actor, ActorInitContext
 from graflo.architecture.actor.config import DescendActorConfig, VertexActorConfig
+from graflo.architecture.actor.edge import EdgeActor
+from graflo.architecture.actor.edge_router import EdgeRouterActor
+from graflo.architecture.actor.transform import TransformActor
+from graflo.architecture.actor.vertex import VertexActor
+from graflo.architecture.actor.vertex_router import VertexRouterActor
 
 if TYPE_CHECKING:
     from graflo.architecture.actor.wrapper import ActorWrapper
@@ -72,9 +77,7 @@ class DescendActor(Actor):
         transform_output_fields: set[str] = set()
         for an in self.descendants:
             if isinstance(an.actor, TransformActor):
-                transform_output_fields.update(
-                    str(k) for k in an.actor.t.map.keys()
-                )
+                transform_output_fields.update(str(k) for k in an.actor.t.map.keys())
 
         if not transform_output_fields:
             return
@@ -139,9 +142,7 @@ class DescendActor(Actor):
                 return [(None, item) for item in doc]
             return [(None, doc)]
 
-    def __call__(
-        self, ctx: Any, lindex: Any, *nargs: Any, **kwargs: Any
-    ) -> Any:
+    def __call__(self, ctx: Any, lindex: Any, *nargs: Any, **kwargs: Any) -> Any:
         doc: Any = kwargs.pop("doc")
         if doc is None:
             raise ValueError(f"{type(self).__name__}: doc should be provided")
@@ -187,13 +188,6 @@ class DescendActor(Actor):
             edges = [(hash_current, hash_a, props_current, props_a)] + edges_a
         return level, type(self), str(self), edges
 
-
-# Must be defined after all actor types are imported (avoid circular import)
-from graflo.architecture.actor.edge import EdgeActor
-from graflo.architecture.actor.edge_router import EdgeRouterActor
-from graflo.architecture.actor.transform import TransformActor
-from graflo.architecture.actor.vertex import VertexActor
-from graflo.architecture.actor.vertex_router import VertexRouterActor
 
 _NodeTypePriority: MappingProxyType[Type[Actor], int] = MappingProxyType(
     {

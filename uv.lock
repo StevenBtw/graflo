@@ -894,21 +894,21 @@ wheels = [
 
 [[package]]
 name = "minijinja"
-sdist = {hash = "sha256:6109593eeb36e3139d4a7a923e3e45d73143f1bf5838d39731eb883310a2a900", size = 276975, upload-time = "2026-02-20T16:48:56.335Z", url = "https://files.pythonhosted.org/packages/c9/49/22a2ef2dfe1efae82f066667887ab7330683eb6b449953a26227886592d0/minijinja-2.16.0.tar.gz"}
+sdist = {hash = "sha256:28af3da2aa5467c560a8bdf8422524f4ebaaba846dc3bc81d66d9b25d1e4456e", size = 278621, upload-time = "2026-03-04T08:16:44.235Z", url = "https://files.pythonhosted.org/packages/e0/f2/44e435ca0a70bc90d6c76766a7250e86d4613bc96515b1af01d5388343e1/minijinja-2.17.1.tar.gz"}
 source = {registry = "https://pypi.org/simple"}
-version = "2.16.0"
+version = "2.17.1"
 wheels = [
-  {hash = "sha256:01a6144a204019f9cdacec23ccc63dfe429b8f0498454ec213e6a2dd3b329a9b", size = 1384051, upload-time = "2026-02-20T16:48:49.66Z", url = "https://files.pythonhosted.org/packages/51/05/c901e7a9364df86d1b186062f5ad4fe70527055ac11ac59c9f4f37bdebe9/minijinja-2.16.0-cp38-abi3-musllinux_1_2_i686.whl"},
-  {hash = "sha256:13ec22d73f9ebc957b436a33d653df804df8eb7bd04bc7f315275cb296757893", size = 1092473, upload-time = "2026-02-20T16:48:43.966Z", url = "https://files.pythonhosted.org/packages/c7/06/33d779ed96712eb61fa01e445f73e9430b474c51a3d33d3785c143265e37/minijinja-2.16.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"},
-  {hash = "sha256:413357af0a5cb469ee3c5ebdecb38a84b943c97b09edcbead7c9f1f5f071d7e7", size = 1240893, upload-time = "2026-02-20T16:48:46.65Z", url = "https://files.pythonhosted.org/packages/9f/b9/45ae481e82fa4dc6d2fe122385a7e72454f879e37bc47efc8b736890221e/minijinja-2.16.0-cp38-abi3-musllinux_1_2_aarch64.whl"},
-  {hash = "sha256:4a8948dc9030958fa9bcace34ccdb9457cc025514d5d8058b0d55e3cd8424eb5", size = 1313927, upload-time = "2026-02-20T16:48:51.345Z", url = "https://files.pythonhosted.org/packages/7d/d2/13dfcc2d9f1a880fe9524b4dacaeffda3495bbf10d21c539761aebf2de01/minijinja-2.16.0-cp38-abi3-musllinux_1_2_x86_64.whl"},
-  {hash = "sha256:52bfaca71ad5ddffc412375a7862213348601ea9c9579044244707909622bbd0", size = 1219264, upload-time = "2026-02-20T16:48:45.289Z", url = "https://files.pythonhosted.org/packages/d0/23/eac5774e8b7d91556483759747ccad77c806e05205cacbb2156593973fec/minijinja-2.16.0-cp38-abi3-manylinux_2_5_i686.manylinux1_i686.whl"},
-  {hash = "sha256:6ecc90fcb764c1977eee30ab4d86a672e0d771daf0711bf6cf1c12bac4148d93", size = 1065625, upload-time = "2026-02-20T16:48:40.773Z", url = "https://files.pythonhosted.org/packages/53/4b/3e21c69d9d588c3b846b43170b232cf9c68419fe7804e54342485ff1fdb8/minijinja-2.16.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"},
-  {hash = "sha256:72e7255e19beac6bb0caa8e3e7669f70709f61398e9d2d0d8c2fb83a279156f6", size = 2031662, upload-time = "2026-02-20T16:48:39.072Z", url = "https://files.pythonhosted.org/packages/58/7c/f44a55b80a5aac4c66a51583f56a3d33bf93008268cea4c6963baffdd886/minijinja-2.16.0-cp38-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"},
-  {hash = "sha256:90679250861f33f1d3a18ef29273ed532f18f8b40969c3f805813e9e0f117fc9", size = 1311147, upload-time = "2026-02-20T16:48:48.265Z", url = "https://files.pythonhosted.org/packages/e1/4a/ac8d6b406624457b68f46eb4d6d76e77f50b43de3c1faa7d375616f1b5b1/minijinja-2.16.0-cp38-abi3-musllinux_1_2_armv7l.whl"},
-  {hash = "sha256:912784ebbb486bc51539c946e8fa074ff5591e6a14c755f964c96565b1841118", size = 1035808, upload-time = "2026-02-20T16:48:42.584Z", url = "https://files.pythonhosted.org/packages/cc/a9/3c884f15cc4e8bdbe9b2db0dd8aa1ecaa5bb8b138511d2ef1de0778e250e/minijinja-2.16.0-cp38-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl"},
-  {hash = "sha256:cbf0c847f2a2ab8d50d3ceca5fe8b8abe27222c8b5ea30907eb42aabc7f76a4a", size = 1042692, upload-time = "2026-02-20T16:48:55.041Z", url = "https://files.pythonhosted.org/packages/86/79/c9b19d970e10c7a8a290eab6cb0f3e702afb0e28b8a7f742d527fc4943a0/minijinja-2.16.0-cp38-abi3-win_amd64.whl"},
-  {hash = "sha256:fcb5cabcf6479dc5b51c1efa7ad1b60b82fe96fa0b7e05110967f514b5790ec9", size = 994468, upload-time = "2026-02-20T16:48:53.014Z", url = "https://files.pythonhosted.org/packages/30/74/c77df83ae1c6391c945a65ffea33422edf9095490c9592eacc951adcb582/minijinja-2.16.0-cp38-abi3-win32.whl"}
+  {hash = "sha256:10b97591206a830700c4ffc8d24f7c6740432a7e78ea4271be32f53d61708647", size = 1314929, upload-time = "2026-03-04T08:16:40.123Z", url = "https://files.pythonhosted.org/packages/3f/8a/1f9a86d5afec830938ddd547a0e7c10520438c76a649c05b8b5a6770a29c/minijinja-2.17.1-cp38-abi3-musllinux_1_2_x86_64.whl"},
+  {hash = "sha256:1b14e25b64da62cc1ee42b8c2a73772217ec62c8749ba097537047b76b0707f5", size = 2033968, upload-time = "2026-03-04T08:16:26.606Z", url = "https://files.pythonhosted.org/packages/7b/a9/f43b5f48038845744c3394011df9b41d19d9b6cc80e64c7a46be78e1b8ec/minijinja-2.17.1-cp38-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"},
+  {hash = "sha256:24483bcb21e626e0dc6e8353b9301ba1de9ee3c0f053b65e2b94c221a8912d85", size = 1063470, upload-time = "2026-03-04T08:16:28.12Z", url = "https://files.pythonhosted.org/packages/77/f5/da290809c4bfd82fac5270f0ba7648b6521dd92803a2f3a80eb5924c6420/minijinja-2.17.1-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"},
+  {hash = "sha256:291f2df2499f24849906a52a23aed823e11d5882c1644e71293f5a5ecbee4736", size = 1094384, upload-time = "2026-03-04T08:16:31.577Z", url = "https://files.pythonhosted.org/packages/32/90/c17ae2b0df4f56d528684d1e4b6c10348cbbb35a7aed48594b6de135759a/minijinja-2.17.1-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"},
+  {hash = "sha256:36c5f0d2408dae0439578ac15ae2ad1be4809ce3298dc1b87d3d1a85860f7273", size = 1216849, upload-time = "2026-03-04T08:16:32.764Z", url = "https://files.pythonhosted.org/packages/93/d1/86f97d4bec816de8bad2bbff8edfd2f30bcda1e64e7b0dd90f53e3282134/minijinja-2.17.1-cp38-abi3-manylinux_2_5_i686.manylinux1_i686.whl"},
+  {hash = "sha256:58cfa2f0dbd1de5e2ceb9357efe6fb6c3450722b767cf815b38b7d25aff73047", size = 1383106, upload-time = "2026-03-04T08:16:38.522Z", url = "https://files.pythonhosted.org/packages/4d/c8/dbdab5b21f037dcf2a554c85e3aa770b7bee51977ce14fd761eb01d0559c/minijinja-2.17.1-cp38-abi3-musllinux_1_2_i686.whl"},
+  {hash = "sha256:9d1d20b4573823454e3c41df67201ecaaa4027d1999f3ae2e0b7dad39aa89e9d", size = 993150, upload-time = "2026-03-04T08:16:41.334Z", url = "https://files.pythonhosted.org/packages/78/c1/9cbb2d857072c6eb2e084b1009d3cdc307eed69ba0cd3b9a6be0383a763f/minijinja-2.17.1-cp38-abi3-win32.whl"},
+  {hash = "sha256:a5dd7a99637faced15dec0176af2b0cbc88a2f06318c31581544a32fce8aa6b8", size = 1238772, upload-time = "2026-03-04T08:16:34.489Z", url = "https://files.pythonhosted.org/packages/2a/5f/1532bc7ee88b8547ddffbd205b217ae3d86ca44f5858a216677036e53f93/minijinja-2.17.1-cp38-abi3-musllinux_1_2_aarch64.whl"},
+  {hash = "sha256:a97d93533015bd6e463be6cab2825727630dd081a634f24033ff815deb42af1a", size = 1045605, upload-time = "2026-03-04T08:16:42.811Z", url = "https://files.pythonhosted.org/packages/dd/75/fe0b1ebdc5f3951299c16babe6364eded3b907998a80ac0d4fc66fde980f/minijinja-2.17.1-cp38-abi3-win_amd64.whl"},
+  {hash = "sha256:ab4919667760579b61e0a27540444050365f3a39b29caccd45ac3e2c461c1a83", size = 1308296, upload-time = "2026-03-04T08:16:37.211Z", url = "https://files.pythonhosted.org/packages/18/e5/25d004226db653b831462a3be2005f9a8409b78ed5f710e20d1119a2f617/minijinja-2.17.1-cp38-abi3-musllinux_1_2_armv7l.whl"},
+  {hash = "sha256:dc2dcb12591ce9115900d02b7ed8d834dae6ebbeb640991c0976375365b78b78", size = 1033699, upload-time = "2026-03-04T08:16:30.343Z", url = "https://files.pythonhosted.org/packages/1e/15/dc1cbcc178d1b6c0c33c2414f73c494da980359d8ec4157846a595b669e1/minijinja-2.17.1-cp38-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl"}
 ]
 
 [[package]]
@@ -1014,11 +1014,11 @@ dependencies = [
   {name = "requests"}
 ]
 name = "mkdocs-material"
-sdist = {hash = "sha256:e5f0a18319699da7e78c35e4a8df7e93537a888660f61a86bd773a7134798f22", size = 4097748, upload-time = "2026-02-24T12:06:22.646Z", url = "https://files.pythonhosted.org/packages/8a/b4/f900fcb8e6f510241e334ca401eddcb61ed880fb6572f7f32e4228472ca1/mkdocs_material-9.7.3.tar.gz"}
+sdist = {hash = "sha256:711b0ee63aca9a8c7124d4c73e83a25aa996e27e814767c3a3967df1b9e56f32", size = 4097804, upload-time = "2026-03-03T19:57:36.827Z", url = "https://files.pythonhosted.org/packages/36/ce/a1cd02ac7448763f0bb56aaf5f23fa2527944ac6df335080c38c2f253165/mkdocs_material-9.7.4.tar.gz"}
 source = {registry = "https://pypi.org/simple"}
-version = "9.7.3"
+version = "9.7.4"
 wheels = [
-  {hash = "sha256:37ebf7b4788c992203faf2e71900be3c197c70a4be9b0d72aed537b08a91dd9d", size = 9305078, upload-time = "2026-02-24T12:06:19.155Z", url = "https://files.pythonhosted.org/packages/b9/1b/16ad0193079bb8a15aa1d2620813a9cd15b18de150a4ea1b2c607fb4c74d/mkdocs_material-9.7.3-py3-none-any.whl"}
+  {hash = "sha256:6549ad95e4d130ed5099759dfa76ea34c593eefdb9c18c97273605518e99cfbf", size = 9305224, upload-time = "2026-03-03T19:57:34.063Z", url = "https://files.pythonhosted.org/packages/e7/94/e3535a9ed078b238df3df75a44694ca0ff5772fd538df4939c658a58c59d/mkdocs_material-9.7.4-py3-none-any.whl"}
 ]
 
 [[package]]
@@ -1718,11 +1718,11 @@ wheels = [
 
 [[package]]
 name = "pytz"
-sdist = {hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3", size = 320884, upload-time = "2025-03-25T02:25:00.538Z", url = "https://files.pythonhosted.org/packages/f8/bf/abbd3cdfb8fbc7fb3d4d38d320f2441b1e7cbe29be4f23797b4a2b5d8aac/pytz-2025.2.tar.gz"}
+sdist = {hash = "sha256:3378dde6a0c3d26719182142c56e60c7f9af7e968076f31aae569d72a0358ee1", size = 321088, upload-time = "2026-03-03T07:47:50.683Z", url = "https://files.pythonhosted.org/packages/56/db/b8721d71d945e6a8ac63c0fc900b2067181dbb50805958d4d4661cf7d277/pytz-2026.1.post1.tar.gz"}
 source = {registry = "https://pypi.org/simple"}
-version = "2025.2"
+version = "2026.1.post1"
 wheels = [
-  {hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00", size = 509225, upload-time = "2025-03-25T02:24:58.468Z", url = "https://files.pythonhosted.org/packages/81/c4/34e93fe5f5429d7570ec1fa436f1986fb1f00c3e0f43a589fe2bbcd22c3f/pytz-2025.2-py2.py3-none-any.whl"}
+  {hash = "sha256:f2fd16142fda348286a75e1a524be810bb05d444e5a081f37f7affc635035f7a", size = 510489, upload-time = "2026-03-03T07:47:49.167Z", url = "https://files.pythonhosted.org/packages/10/99/781fe0c827be2742bcc775efefccb3b048a3a9c6ce9aec0cbf4a101677e5/pytz-2026.1.post1-py2.py3-none-any.whl"}
 ]
 
 [[package]]
@@ -2011,11 +2011,11 @@ wheels = [
 
 [[package]]
 name = "tabulate"
-sdist = {hash = "sha256:0095b12bf5966de529c0feb1fa08671671b3368eec77d7ef7ab114be2c068b3c", size = 81090, upload-time = "2022-10-06T17:21:48.54Z", url = "https://files.pythonhosted.org/packages/ec/fe/802052aecb21e3797b8f7902564ab6ea0d60ff8ca23952079064155d1ae1/tabulate-0.9.0.tar.gz"}
+sdist = {hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z", url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz"}
 source = {registry = "https://pypi.org/simple"}
-version = "0.9.0"
+version = "0.10.0"
 wheels = [
-  {hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f", size = 35252, upload-time = "2022-10-06T17:21:44.262Z", url = "https://files.pythonhosted.org/packages/40/44/4a5f08c96eb108af5cb50b41f76142f0afa346dfa99d5296fe7202a11854/tabulate-0.9.0-py3-none-any.whl"}
+  {hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z", url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl"}
 ]
 
 [[package]]
@@ -2044,11 +2044,11 @@ wheels = [
 
 [[package]]
 name = "types-pytz"
-sdist = {hash = "sha256:fca87917836ae843f07129567b74c1929f1870610681b4c92cb86a3df5817bdb", size = 10961, upload-time = "2025-11-08T02:55:57.001Z", url = "https://files.pythonhosted.org/packages/40/ff/c047ddc68c803b46470a357454ef76f4acd8c1088f5cc4891cdd909bfcf6/types_pytz-2025.2.0.20251108.tar.gz"}
+sdist = {hash = "sha256:0c3542d8e9b0160b424233440c52b83d6f58cae4b85333d54e4f961cf013e117", size = 11198, upload-time = "2026-03-04T03:57:24.445Z", url = "https://files.pythonhosted.org/packages/fe/56/2f12a15ea8c5615c8fb896c4fbbb527ab1c0f776ed5860c6fc9ec26ea2c7/types_pytz-2026.1.1.20260304.tar.gz"}
 source = {registry = "https://pypi.org/simple"}
-version = "2025.2.0.20251108"
+version = "2026.1.1.20260304"
 wheels = [
-  {hash = "sha256:0f1c9792cab4eb0e46c52f8845c8f77cf1e313cb3d68bf826aa867fe4717d91c", size = 10116, upload-time = "2025-11-08T02:55:56.194Z", url = "https://files.pythonhosted.org/packages/e7/c1/56ef16bf5dcd255155cc736d276efa6ae0a5c26fd685e28f0412a4013c01/types_pytz-2025.2.0.20251108-py3-none-any.whl"}
+  {hash = "sha256:175332c1cf7bd6b1cc56b877f70bf02def1a3f75e5adcc05385ce2c3c70e6500", size = 10126, upload-time = "2026-03-04T03:57:23.481Z", url = "https://files.pythonhosted.org/packages/94/b8/e77c355f179dc89d44e7ca6dbf7a46e650806df1d356a5462e5829fccea5/types_pytz-2026.1.1.20260304-py3-none-any.whl"}
 ]
 
 [[package]]

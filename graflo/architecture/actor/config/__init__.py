@@ -10,7 +10,10 @@ from graflo.architecture.actor.config.models import (
     VertexRouterActorConfig,
 )
 from graflo.architecture.actor.config.normalize import normalize_actor_step
-from graflo.architecture.actor.config.parse import parse_root_config, validate_actor_step
+from graflo.architecture.actor.config.parse import (
+    parse_root_config,
+    validate_actor_step,
+)
 
 __all__ = [
     "ActorConfig",

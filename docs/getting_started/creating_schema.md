@@ -361,6 +361,15 @@ resources:
 
 This defines two vertex types (`person`, `department`), one edge type (`person` → `department`), and two resources: **people** (each row → one `person` vertex) and **departments** (transform + `department` vertices). Data sources are attached to these resources by name (e.g. via `Patterns` or `DataSourceRegistry`) as shown in the [Quick Start](quickstart.md).
 
+## Patterns and data source binding
+
+Schema defines *what* to extract; **Patterns** define *where* data comes from. For SQL tables, use `TablePattern` with optional `view: SelectSpec` for advanced control over the query:
+
+- **Default**: `TablePattern` with `table_name`, `joins`, `filters` builds a standard `SELECT` query.
+- **SelectSpec view**: Use `view: SelectSpec` for full control — either `kind="select"` (custom `from`, `joins`, `select`, `where`) or `kind="type_lookup"` (shorthand for edge tables where source/target types come from a lookup table via FK joins).
+
+See [filter.view](../reference/filter/view.md) for SelectSpec details.
+
 ## See also
 
 - [Concepts — Schema and constituents](../concepts/index.md#schema) for higher-level overview.

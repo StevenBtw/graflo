@@ -77,7 +77,7 @@ The `DataSourceRegistry` manages `AbstractDataSource` adapters, each carrying a 
 - **Schema inference** — Generate graph schemas from PostgreSQL 3NF databases (PK/FK heuristics) or from OWL/RDFS ontologies. See [Example 5](examples/example-5.md).
 - **Typed fields** — Vertex fields and edge weights carry types for validation and database-specific optimisation.
 - **Parallel batch processing** — Configurable batch sizes and multi-core execution.
-- **Advanced filtering** — Server-side filtering (e.g. TigerGraph REST++ API) and client-side filter expressions.
+- **Advanced filtering** — Server-side filtering (e.g. TigerGraph REST++ API), client-side filter expressions, and **SelectSpec** for declarative SQL view/filter control before data reaches Resources.
 - **Blank vertices** — Create intermediate nodes for complex relationship modelling.
 
 ## Quick Links

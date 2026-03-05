@@ -6,17 +6,17 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from graflo.architecture.actor.base import Actor, ActorInitContext
-
-if TYPE_CHECKING:
-    from graflo.architecture.actor.wrapper import ActorWrapper
-
-logger = logging.getLogger(__name__)
 from graflo.architecture.actor.config import (
     VertexActorConfig,
     VertexRouterActorConfig,
 )
 from graflo.architecture.onto import ExtractionContext, LocationIndex
 from graflo.architecture.vertex import VertexConfig
+
+if TYPE_CHECKING:
+    from graflo.architecture.actor.wrapper import ActorWrapper
+
+logger = logging.getLogger(__name__)
 
 
 class VertexRouterActor(Actor):
@@ -27,9 +27,7 @@ class VertexRouterActor(Actor):
         self.prefix = config.prefix
         self.field_map = config.field_map
         self.type_map: dict[str, str] = config.type_map or {}
-        self.vertex_from_map: dict[str, dict[str, str]] = (
-            config.vertex_from_map or {}
-        )
+        self.vertex_from_map: dict[str, dict[str, str]] = config.vertex_from_map or {}
         self._vertex_actors: dict[str, ActorWrapper] = {}
         self._init_ctx: ActorInitContext | None = None
         self.vertex_config: VertexConfig = VertexConfig(vertices=[])
@@ -68,7 +66,6 @@ class VertexRouterActor(Actor):
             raise RuntimeError(
                 "VertexRouterActor._get_or_create_wrapper called before finish_init"
             )
-        from graflo.architecture.actor.wrapper import ActorWrapper
 
         from_doc = self.vertex_from_map.get(vertex_type)
         config = VertexActorConfig(vertex=vertex_type, from_doc=from_doc)

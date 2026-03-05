@@ -705,6 +705,7 @@ resources:
 - **Vertex Filtering** — filter vertices based on custom conditions.
 - **PostgreSQL Schema Inference** — infer schemas from normalised PostgreSQL databases (3NF) with PK/FK constraints.
 - **RDF / OWL Schema Inference** — infer schemas from OWL/RDFS ontologies: `owl:Class` → vertices, `owl:ObjectProperty` → edges, `owl:DatatypeProperty` → vertex fields.
+- **SelectSpec** — declarative view specification for advanced filtering and projection of SQL data before feeding into Resources. Use `TablePattern.view` with `SelectSpec` (full SQL-like `select` or `type_lookup` shorthand for edge tables with FK-based type resolution) to control exactly what data is queried.
 
 ### Performance Optimization
 - **Batch Processing**: Process large datasets in configurable batches (`batch_size` parameter of `Caster`)

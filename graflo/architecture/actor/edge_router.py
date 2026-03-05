@@ -6,12 +6,12 @@ import logging
 from typing import Any
 
 from graflo.architecture.actor.base import Actor, ActorInitContext
-
-logger = logging.getLogger(__name__)
 from graflo.architecture.actor.config import EdgeRouterActorConfig
 from graflo.architecture.edge import Edge, EdgeConfig
 from graflo.architecture.onto import ExtractionContext, LocationIndex, VertexRep
 from graflo.architecture.vertex import VertexConfig
+
+logger = logging.getLogger(__name__)
 
 
 class EdgeRouterActor(Actor):
@@ -50,7 +50,7 @@ class EdgeRouterActor(Actor):
 
     def _resolve_type(self, raw: str, type_map: dict[str, str]) -> str | None:
         resolved = type_map.get(raw, raw)
-        if         resolved not in self.vertex_config.vertex_set:
+        if resolved not in self.vertex_config.vertex_set:
             logger.debug(
                 "EdgeRouterActor: resolved type '%s' not in vertex_set, skipping",
                 resolved,
@@ -147,9 +147,7 @@ class EdgeRouterActor(Actor):
         return ctx
 
     def references_vertices(self) -> set[str]:
-        return {s for s, _, _ in self._edge_cache} | {
-            t for _, t, _ in self._edge_cache
-        }
+        return {s for s, _, _ in self._edge_cache} | {t for _, t, _ in self._edge_cache}
 
     def fetch_important_items(self) -> dict[str, Any]:
         items: dict[str, Any] = {
