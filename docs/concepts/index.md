@@ -248,6 +248,8 @@ classDiagram
     }
     class VertexActor
     class EdgeActor
+    class VertexRouterActor
+    class EdgeRouterActor
     class TransformActor
     class DescendActor
 
@@ -303,6 +305,8 @@ classDiagram
 
     Actor <|-- VertexActor
     Actor <|-- EdgeActor
+    Actor <|-- VertexRouterActor
+    Actor <|-- EdgeRouterActor
     Actor <|-- TransformActor
     Actor <|-- DescendActor
 ```
@@ -560,7 +564,7 @@ Resource-level edge inference controls:
 - **Auto-exclusion**: When a resource pipeline contains any EdgeActor for edges of type `(source, target)`, `(source, target, None)` is automatically added to `infer_edge_except` for that resource, so inferred edges do not duplicate edges produced by explicit edge actors.
 
 ### Actor
-An `Actor` describes how the current level of the document should be mapped/transformed to the property graph vertices and edges. There are four types that act on the provided document in this order:
+An `Actor` describes how the current level of the document should be mapped/transformed to the property graph vertices and edges. There are six actor types:
  
 - `DescendActor`: Navigates to the next level in the hierarchy. Supports:
   - `key`: Process a specific key in a dictionary
@@ -568,6 +572,28 @@ An `Actor` describes how the current level of the document should be mapped/tran
 - `TransformActor`: Applies data transformations
 - `VertexActor`: Creates vertices from the current level
 - `EdgeActor`: Creates edges between vertices
+- `VertexRouterActor`: Routes documents to the correct `VertexActor` based on a type field in the document (dynamic vertex-type routing)
+- `EdgeRouterActor`: Routes documents to dynamically created edges based on source/target type fields and optional relation field
+
+```mermaid
+flowchart TB
+    subgraph actors [Actor Types]
+        D[DescendActor]
+        T[TransformActor]
+        V[VertexActor]
+        E[EdgeActor]
+        VR[VertexRouterActor]
+        ER[EdgeRouterActor]
+    end
+    Doc[Document] --> D
+    Doc --> T
+    Doc --> V
+    Doc --> E
+    Doc --> VR
+    Doc --> ER
+    VR -.->|routes by type_field| V
+    ER -.->|routes by source/target/relation fields| E
+```
 
 ### Transform
 

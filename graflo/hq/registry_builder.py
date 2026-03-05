@@ -122,7 +122,8 @@ class RegistryBuilder:
         Returns:
             Matching file paths.
         """
-        assert pattern.sub_path is not None
+        if pattern.sub_path is None:
+            raise ValueError("pattern.sub_path is required")
         path = Path(fpath) if isinstance(fpath, str) else fpath
 
         files = [

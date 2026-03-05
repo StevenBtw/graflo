@@ -156,7 +156,7 @@ Resources define **how** each data stream is turned into vertices and edges. Eac
 
 ### Actor steps in `apply` / `pipeline`
 
-Each step is a dict. You can write steps in shorthand (e.g. `vertex: person`) or with an explicit **`type`** (`vertex`, `transform`, `edge`, `descend`). The system recognizes:
+Each step is a dict. You can write steps in shorthand (e.g. `vertex: person`) or with an explicit **`type`** (`vertex`, `transform`, `edge`, `descend`, `vertex_router`, `edge_router`). The system recognizes:
 
 1. **Vertex step** — create vertices of a given type from the current document level:
    ```yaml
@@ -243,6 +243,34 @@ Each step is a dict. You can write steps in shorthand (e.g. `vertex: person`) or
    - any_key: true
      apply: [...]
    ```
+
+5. **Vertex router step** — route documents to the correct vertex type based on a type field:
+   ```yaml
+   - vertex_router:
+       type_field: type
+       type_map:
+         Person: person
+         Vehicle: vehicle
+         Institution: institution
+   ```
+   Use when each row has a type discriminator (e.g. CSV with a `type` column). The router dispatches to the appropriate `VertexActor` per document.
+
+6. **Edge router step** — create edges with dynamic source/target types and optional relation from document fields:
+   ```yaml
+   - edge_router:
+       source_type_field: source_type
+       target_type_field: target_type
+       source_fields: {id: source_id}
+       target_fields: {id: target_id}
+       relation_field: relation_type
+       type_map:
+         Person: person
+         Vehicle: vehicle
+       relation_map:
+         EMPLOYED_BY: employed_by
+         OWNS: owns
+   ```
+   Use when each row describes a relation with source/target types and relation name in columns (e.g. a relations table).
 
 ### Rules for resources (for agents)
 
