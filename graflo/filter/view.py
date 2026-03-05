@@ -73,7 +73,9 @@ class SelectSpec(ConfigBaseModel):
 
     def _build_type_lookup_sql(self, schema: str, base_table: str) -> str:
         """Expand type_lookup shorthand to full SQL."""
-        if not all([self.table, self.identity, self.type_column, self.source, self.target]):
+        if not all(
+            [self.table, self.identity, self.type_column, self.source, self.target]
+        ):
             raise ValueError(
                 "type_lookup requires table, identity, type_column, source, target"
             )
@@ -98,8 +100,8 @@ class SelectSpec(ConfigBaseModel):
         select_clause = ", ".join(select_parts)
 
         from_clause = f"{base_ref} r"
-        join_s = f"LEFT JOIN {lookup_ref} s ON r.\"{src_fk}\" = s.\"{ident}\""
-        join_t = f"LEFT JOIN {lookup_ref} t ON r.\"{tgt_fk}\" = t.\"{ident}\""
+        join_s = f'LEFT JOIN {lookup_ref} s ON r."{src_fk}" = s."{ident}"'
+        join_t = f'LEFT JOIN {lookup_ref} t ON r."{tgt_fk}" = t."{ident}"'
         from_clause += f" {join_s} {join_t}"
 
         where_parts = [

@@ -137,7 +137,7 @@ class TestSelectSpecTypeLookup:
         sql = spec.build_sql(schema="main", base_table="entity_links")
 
         # SQLite ignores schema prefix; strip it for compatibility
-        sql_sqlite = sql.replace('"main".', "").replace('main.', "")
+        sql_sqlite = sql.replace('"main".', "").replace("main.", "")
 
         ds = SQLDataSource(
             config=SQLConfig(
@@ -203,7 +203,7 @@ class TestTablePatternWithView:
             },
         )
         sql = pattern.build_query("main")
-        sql_sqlite = sql.replace('"main".', "").replace('main.', "")
+        sql_sqlite = sql.replace('"main".', "").replace("main.", "")
 
         ds = SQLDataSource(
             config=SQLConfig(
