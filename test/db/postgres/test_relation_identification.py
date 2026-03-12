@@ -136,7 +136,7 @@ class TestRelationIdentification:
         assert target == "host"
         assert relation == "containment"
 
-        # Test product_category_mapping pattern
+        # Test product_category_mapping connector
         source, target, relation = infer_edge_vertices_from_table_name(
             "product_category_mapping",
             ["product_id", "category_id"],
@@ -212,7 +212,7 @@ class TestRelationIdentification:
         assert target is None
         assert relation is None
 
-    def test_infer_edge_vertices_complex_patterns(self):
+    def test_infer_edge_vertices_complex_connectors(self):
         """Test inference with complex naming patterns."""
         vertex_names = ["cluster", "host", "user", "product", "category"]
 

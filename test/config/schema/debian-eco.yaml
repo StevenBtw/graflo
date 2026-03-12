@@ -1,37 +1,39 @@
-metadata:
-    name: debian-eco
-    version: 0.0.1
-graph:
-    vertex_config:
-        vertices:
-        -   name: package
-            fields:
-            -   name
-            -   version
-            identity:
-            -   name
-        -   name: maintainer
-            fields:
-            -   name
-            -   email
-            identity:
-            -   email
-        -   name: bug
-            fields:
-            -   id
-            -   subject
-            -   severity
-            -   date
-            identity:
-            -   id
-    edge_config:
-        edges:
-        -   source: package
-            target: package
-        -   source: maintainer
-            target: package
-        -   source: package
-            target: bug
+schema:
+    metadata:
+        name: debian-eco
+        version: 0.0.1
+    graph:
+        vertex_config:
+            vertices:
+            -   name: package
+                fields:
+                -   name
+                -   version
+                identity:
+                -   name
+            -   name: maintainer
+                fields:
+                -   name
+                -   email
+                identity:
+                -   email
+            -   name: bug
+                fields:
+                -   id
+                -   subject
+                -   severity
+                -   date
+                identity:
+                -   id
+        edge_config:
+            edges:
+            -   source: package
+                target: package
+            -   source: maintainer
+                target: package
+            -   source: package
+                target: bug
+    db_profile: {}
 ingestion_model:
     resources:
     -   resource_name: package
@@ -57,3 +59,4 @@ ingestion_model:
                 bug_num: id
         -   vertex: package
         -   vertex: bug
+bindings: {}

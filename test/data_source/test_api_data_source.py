@@ -6,6 +6,7 @@ from os.path import dirname, realpath
 
 import pytest
 
+from test.conftest import fetch_manifest_obj
 from graflo.hq.caster import Caster
 from graflo.data_source import (
     APIConfig,
@@ -15,12 +16,6 @@ from graflo.data_source import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _require_ingestion_model(schema):
-    ingestion_model = schema.ingestion_model
-    assert ingestion_model is not None
-    return ingestion_model
 
 
 @pytest.fixture()
@@ -33,13 +28,13 @@ def api_mode():
     return "kg"  # Use kg schema for API test
 
 
-def test_api_data_source_basic(
-    mock_api_server, api_mode, schema_obj, current_path, reset
-):
+def test_api_data_source_basic(mock_api_server, api_mode, current_path, reset):
     """Test basic API data source functionality."""
     server, port = mock_api_server
     resource_name = api_mode.split("_")[0]
-    schema = schema_obj(api_mode)
+    manifest = fetch_manifest_obj(api_mode)
+    schema = manifest.require_schema()
+    ingestion_model = manifest.require_ingestion_model()
 
     # Create API config
     api_config = APIConfig(
@@ -60,7 +55,7 @@ def test_api_data_source_basic(
     api_source.resource_name = resource_name
 
     # Create caster and process
-    caster = Caster(schema, _require_ingestion_model(schema), n_cores=1)
+    caster = Caster(schema, ingestion_model, n_cores=1)
     asyncio.run(
         caster.process_data_source(data_source=api_source, resource_name=resource_name)
     )
@@ -71,15 +66,17 @@ def test_api_data_source_basic(
 
 
 def test_api_data_source_via_process_resource(
-    mock_api_server, api_mode, schema_obj, current_path, reset
+    mock_api_server, api_mode, current_path, reset
 ):
     """Test API data source via process_resource with config dict."""
     server, port = mock_api_server
     resource_name = api_mode.split("_")[0]
-    schema = schema_obj(api_mode)
+    manifest = fetch_manifest_obj(api_mode)
+    schema = manifest.require_schema()
+    ingestion_model = manifest.require_ingestion_model()
 
     # Create caster
-    caster = Caster(schema, _require_ingestion_model(schema), n_cores=1)
+    caster = Caster(schema, ingestion_model, n_cores=1)
 
     # Process using configuration dict
     resource_config = {

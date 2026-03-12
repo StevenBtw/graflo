@@ -33,8 +33,8 @@ GraFlo separates *what the graph looks like* from *where data comes from* and *w
 flowchart LR
     SI["<b>Source Instance</b><br/>File · SQL · SPARQL · API"]
     R["<b>Resource</b><br/>Actor Pipeline"]
-    GS["<b>Logical Graph Schema</b><br/>Vertex/Edge Definitions<br/>Identities · Transforms"]
-    DBA["<b>DB-aware Projection</b><br/>DatabaseFeatures<br/>VertexConfigDBAware · EdgeConfigDBAware"]
+    GS["<b>Logical Graph Schema</b><br/>Vertex/Edge Definitions<br/>Identities · DB Profile"]
+    DBA["<b>DB-aware Projection</b><br/>DatabaseProfile<br/>VertexConfigDBAware · EdgeConfigDBAware"]
     GC["<b>GraphContainer</b><br/>Covariant Graph Representation"]
     DB["<b>Graph DB (LPG)</b><br/>ArangoDB · Neo4j · TigerGraph · Others"]
 
@@ -46,20 +46,20 @@ flowchart LR
 | Stage | Role | Code |
 |-------|------|------|
 | **Source Instance** | A concrete data artifact — a CSV file, a PostgreSQL table, a SPARQL endpoint, a `.ttl` file. | `AbstractDataSource` subclasses (`FileDataSource`, `SQLDataSource`, `SparqlEndpointDataSource`, …) with a `DataSourceType`. |
-| **Resource** | A reusable transformation pipeline — actor steps (descend, transform, vertex, edge, vertex_router, edge_router) that map raw records to graph elements. Data sources bind to Resources by name via the `DataSourceRegistry`. | `Resource` (part of `Schema`). |
-| **Graph Schema** | Declarative logical vertex/edge definitions, identities, typed fields, and named transforms — defined in YAML or Python. | `Schema`, `VertexConfig`, `EdgeConfig`. |
+| **Resource** | A reusable transformation pipeline — actor steps (descend, transform, vertex, edge, vertex_router, edge_router) that map raw records to graph elements. Data sources bind to Resources by name via the `DataSourceRegistry`. | `Resource` (part of `IngestionModel`). |
+| **Graph Schema** | Declarative logical vertex/edge definitions, identities, typed fields, and DB profile — defined in YAML or Python. | `Schema`, `VertexConfig`, `EdgeConfig`. |
 | **Covariant Graph Representation** | A database-independent collection of vertices and edges. | `GraphContainer`. |
-| **DB-aware Projection** | Resolves DB-specific naming/default/index behavior from logical schema + `DatabaseFeatures`. | `Schema.resolve_db_aware()`, `VertexConfigDBAware`, `EdgeConfigDBAware`. |
+| **DB-aware Projection** | Resolves DB-specific naming/default/index behavior from logical schema + `DatabaseProfile`. | `Schema.resolve_db_aware()`, `VertexConfigDBAware`, `EdgeConfigDBAware`. |
 | **Graph DB** | The target LPG store — same API for all supported databases. | `ConnectionManager`, `DBWriter`, DB connectors. |
 
 ### Supported source types (`DataSourceType`)
 
-| DataSourceType | Pattern | DataSource | Schema inference |
+| DataSourceType | Connector | DataSource | Schema inference |
 |---|---|---|---|
-| `FILE` — CSV / JSON / JSONL / Parquet | `FilePattern` | `FileDataSource` | manual |
-| `SQL` — PostgreSQL tables | `TablePattern` | `SQLDataSource` | automatic (3NF with PK/FK) |
-| `SPARQL` — RDF files (`.ttl`, `.rdf`, `.n3`) | `SparqlPattern` | `RdfFileDataSource` | automatic (OWL/RDFS ontology) |
-| `SPARQL` — SPARQL endpoints (Fuseki, …) | `SparqlPattern` | `SparqlEndpointDataSource` | automatic (OWL/RDFS ontology) |
+| `FILE` — CSV / JSON / JSONL / Parquet | `FileConnector` | `FileDataSource` | manual |
+| `SQL` — PostgreSQL tables | `TableConnector` | `SQLDataSource` | automatic (3NF with PK/FK) |
+| `SPARQL` — RDF files (`.ttl`, `.rdf`, `.n3`) | `SparqlConnector` | `RdfFileDataSource` | automatic (OWL/RDFS ontology) |
+| `SPARQL` — SPARQL endpoints (Fuseki, …) | `SparqlConnector` | `SparqlEndpointDataSource` | automatic (OWL/RDFS ontology) |
 | `API` — REST APIs | — | `APIDataSource` | manual |
 | `IN_MEMORY` — list / DataFrame | — | `InMemoryDataSource` | manual |
 
@@ -96,12 +96,13 @@ pip install graflo[sparql]
 ```python
 from suthing import FileHandle
 
-from graflo import Bindings, IngestionModel, Schema
+from graflo import Bindings, GraphManifest
 from graflo.db.connection.onto import ArangoConfig
 
-schema_raw = FileHandle.load("schema.yaml")
-schema = Schema.from_config(schema_raw)
-ingestion_model = IngestionModel.from_config(schema_raw)
+manifest = GraphManifest.from_config(FileHandle.load("schema.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Option 1: Load config from docker/arango/.env (recommended)
 conn_conf = ArangoConfig.from_docker_env()
@@ -124,14 +125,14 @@ user_conn_conf = ArangoConfig.from_env(prefix="USER")
 # Note: If 'database' (or 'schema_name' for TigerGraph) is not set,
 # Caster will automatically use Schema.metadata.name as fallback
 
-from graflo.util.onto import FilePattern
+from graflo.architecture.bindings import FileConnector
 import pathlib
 
-# Create Bindings with file patterns
+# Create Bindings with file connectors
 bindings = Bindings()
-bindings.add_file_pattern(
+bindings.add_file_connector(
     "work",
-    FilePattern(regex="\Sjson$", sub_path=pathlib.Path("./data"), resource_name="work")
+    FileConnector(regex="\Sjson$", sub_path=pathlib.Path("./data"), resource_name="work")
 )
 
 # Or use resource_mapping for simpler initialization
@@ -147,16 +148,17 @@ from graflo.hq import GraphEngine
 # Option 1: Use GraphEngine for schema definition and ingestion (recommended)
 engine = GraphEngine()
 ingestion_params = IngestionParams(
-    recreate_schema=False,  # Set to True to drop and redefine schema (script halts if schema exists)
+    clear_data=False,
     # max_items=1000,  # Optional: limit number of items to process
     # batch_size=10000,  # Optional: customize batch size
 )
 
+ingest_manifest = manifest.model_copy(update={"bindings": bindings})
+ingest_manifest.finish_init()
+
 engine.define_and_ingest(
-    schema=schema,
-    ingestion_model=ingestion_model,
+    manifest=ingest_manifest,
     target_db_config=conn_conf,  # Target database config
-    bindings=bindings,  # Source data bindings
     ingestion_params=ingestion_params,
     recreate_schema=False,  # Set to True to drop and redefine schema (script halts if schema exists)
 )
@@ -164,12 +166,12 @@ engine.define_and_ingest(
 # Option 2: Use Caster directly (schema must be defined separately)
 # from graflo.hq import GraphEngine
 # engine = GraphEngine()
-# engine.define_schema(schema=schema, target_db_config=conn_conf, recreate_schema=False)
+# engine.define_schema(manifest=manifest, target_db_config=conn_conf, recreate_schema=False)
 # 
-# caster = Caster(schema)
+# caster = Caster(schema=schema, ingestion_model=ingestion_model)
 # caster.ingest(
 #     target_db_config=conn_conf,
-#     patterns=patterns,
+#     bindings=bindings,
 #     ingestion_params=ingestion_params,
 # )
 ```
@@ -188,21 +190,23 @@ postgres_config = PostgresConfig.from_docker_env()  # or PostgresConfig.from_env
 # Create GraphEngine and infer schema from PostgreSQL 3NF database
 # Connection is automatically managed inside infer_schema()
 engine = GraphEngine(target_db_flavor=DBType.ARANGO)
-schema = engine.infer_schema(
+manifest = engine.infer_schema(
     postgres_config,
     schema_name="public",  # PostgreSQL schema name
 )
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Define schema in target database (optional, can also use define_and_ingest)
 target_config = ArangoConfig.from_docker_env()
 engine.define_schema(
-    schema=schema,
+    manifest=manifest,
     target_db_config=target_config,
     recreate_schema=False,
 )
 
 # Use the inferred schema with Caster for ingestion
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 # ... continue with ingestion
 ```
 
@@ -212,26 +216,34 @@ caster = Caster(schema)
 from pathlib import Path
 from graflo.hq import GraphEngine
 from graflo.db.connection.onto import ArangoConfig
+from graflo.architecture.manifest import GraphManifest
 
 engine = GraphEngine()
 
 # Infer schema from an OWL/RDFS ontology file
 ontology = Path("ontology.ttl")
-schema = engine.infer_schema_from_rdf(source=ontology)
+schema, ingestion_model = engine.infer_schema_from_rdf(source=ontology)
 
-# Create data-source patterns (reads a local .ttl file per rdf:Class)
-patterns = engine.create_patterns_from_rdf(source=ontology)
+# Create source bindings (reads a local .ttl file per rdf:Class)
+bindings = engine.create_bindings_from_rdf(source=ontology)
 
 # Or point at a SPARQL endpoint instead:
 # from graflo.db.connection.onto import SparqlEndpointConfig
 # sparql_cfg = SparqlEndpointConfig(uri="http://localhost:3030", dataset="mydata")
-# patterns = engine.create_patterns_from_rdf(
+# bindings = engine.create_bindings_from_rdf(
 #     source=ontology,
 #     endpoint_url=sparql_cfg.query_endpoint,
 # )
 
 target = ArangoConfig.from_docker_env()
-engine.define_and_ingest(schema=schema, target_db_config=target, patterns=patterns)
+engine.define_and_ingest(
+    manifest=GraphManifest(
+        graph_schema=schema,
+        ingestion_model=ingestion_model,
+        bindings=bindings,
+    ),
+    target_db_config=target,
+)
 ```
 
 ## Development

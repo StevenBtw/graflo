@@ -1,6 +1,6 @@
 import pytest
 
-from graflo.architecture.schema import IngestionModel, Schema
+from graflo.architecture.manifest import GraphManifest
 
 
 def _minimal_graph() -> dict:
@@ -12,30 +12,25 @@ def _minimal_graph() -> dict:
     }
 
 
-def test_schema_from_config_rejects_top_level_resources():
-    cfg = {
-        "metadata": {"name": "kg"},
-        "graph": _minimal_graph(),
-        "resources": [{"resource_name": "people", "pipeline": [{"vertex": "person"}]}],
-    }
-    with pytest.raises(ValueError, match="Unknown top-level keys"):
-        Schema.from_config(cfg)
-
-
-def test_ingestion_from_config_requires_nested_ingestion_model():
+def test_manifest_requires_nested_schema_block():
     cfg = {
         "metadata": {"name": "kg"},
         "graph": _minimal_graph(),
     }
-    with pytest.raises(ValueError, match="Missing required 'ingestion_model'"):
-        IngestionModel.from_config(cfg)
+    with pytest.raises(ValueError):
+        GraphManifest.from_config(cfg)
 
 
-def test_ingestion_from_config_rejects_unknown_ingestion_keys():
+def test_manifest_requires_at_least_one_block():
+    with pytest.raises(ValueError, match="GraphManifest requires at least one block"):
+        GraphManifest.from_config({})
+
+
+def test_manifest_accepts_nested_schema_and_ingestion():
     cfg = {
-        "metadata": {"name": "kg"},
-        "graph": _minimal_graph(),
-        "ingestion_model": {"resources": [], "legacy": True},
+        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "ingestion_model": {"resources": []},
     }
-    with pytest.raises(ValueError, match="Unknown keys under ingestion_model"):
-        IngestionModel.from_config(cfg)
+    manifest = GraphManifest.from_config(cfg)
+    assert manifest.graph_schema is not None
+    assert manifest.ingestion_model is not None

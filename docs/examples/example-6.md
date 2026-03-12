@@ -1,13 +1,13 @@
 # Example 6: RDF / Turtle Ingestion with Explicit Resource Mapping
 
-This example demonstrates how to ingest data from RDF (Turtle) files into a graph database, using OWL ontology inference for the schema and explicit `SparqlPattern` resource mapping for the data.
+This example demonstrates how to ingest data from RDF (Turtle) files into a graph database, using OWL ontology inference for the schema and explicit `SparqlConnector` resource mapping for the data.
 
 ## Overview
 
 Instead of manually writing a YAML schema, this example shows how to:
 
 - **Infer the graph schema** automatically from an OWL ontology (TBox)
-- **Build patterns explicitly** using `SparqlPattern` — one per `rdf:Class` — pointing at a local Turtle data file
+- **Build bindings explicitly** using `SparqlConnector` — one per `rdf:Class` — pointing at a local Turtle data file
 - **Ingest RDF instance data** (ABox) into a graph database (ArangoDB, Neo4j, TigerGraph, FalkorDB)
 
 ## Requirements
@@ -119,14 +119,14 @@ db_type = conn_conf.connection_type
 
 ### Step 2: Infer Schema from the OWL Ontology
 
-`GraphEngine.infer_schema_from_rdf()` reads the ontology file and automatically produces a complete graflo Schema:
+`GraphEngine.infer_schema_from_rdf()` reads the ontology file and automatically produces a logical `Schema` plus an `IngestionModel`:
 
 ```python
 from graflo.hq import GraphEngine
 
 engine = GraphEngine(target_db_flavor=db_type)
 
-schema = engine.infer_schema_from_rdf(
+schema, ingestion_model = engine.infer_schema_from_rdf(
     source="data/ontology.ttl",
     schema_name="academic_kg",
 )
@@ -141,84 +141,87 @@ schema = engine.infer_schema_from_rdf(
 
 ### Inferred Schema Structure
 
-The inferred schema is equivalent to this YAML:
+The inferred manifest blocks are equivalent to this YAML shape:
 
 ```yaml
-general:
+schema:
+  metadata:
     name: academic_kg
-vertex_config:
-    vertices:
-    -   name: Researcher
+  graph:
+    vertex_config:
+      vertices:
+      - name: Researcher
         fields: [_key, _uri, fullName, orcid]
-    -   name: Publication
+      - name: Publication
         fields: [_key, _uri, title, year, doi]
-    -   name: Institution
+      - name: Institution
         fields: [_key, _uri, instName, country]
-edge_config:
-    edges:
-    -   source: Researcher
+    edge_config:
+      edges:
+      - source: Researcher
         target: Publication
         relation: authorOf
-    -   source: Researcher
+      - source: Researcher
         target: Institution
         relation: affiliatedWith
-    -   source: Publication
+      - source: Publication
         target: Publication
         relation: cites
-resources:
--   resource_name: Researcher
+ingestion_model:
+  resources:
+  - resource_name: Researcher
     apply:
-    -   vertex: Researcher
-    -   source: Researcher
-        target: Publication
-        relation: authorOf
-    -   source: Researcher
-        target: Institution
-        relation: affiliatedWith
--   resource_name: Publication
+    - vertex: Researcher
+    - source: Researcher
+      target: Publication
+      relation: authorOf
+    - source: Researcher
+      target: Institution
+      relation: affiliatedWith
+  - resource_name: Publication
     apply:
-    -   vertex: Publication
-    -   source: Publication
-        target: Publication
-        relation: cites
--   resource_name: Institution
+    - vertex: Publication
+    - source: Publication
+      target: Publication
+      relation: cites
+  - resource_name: Institution
     apply:
-    -   vertex: Institution
+    - vertex: Institution
 ```
 
-### Step 3: Build Patterns with Explicit Resource Mapping
+### Step 3: Build Bindings with Explicit Resource Mapping
 
-Instead of calling `engine.create_patterns_from_rdf()` (which does this automatically), we construct each `SparqlPattern` by hand. This gives full control over which `rdf:Class` URI maps to which resource and which file (or endpoint) provides the data:
+Instead of calling `engine.create_bindings_from_rdf()` (which does this automatically), we construct each `SparqlConnector` by hand. This gives full control over which `rdf:Class` URI maps to which resource and which file (or endpoint) provides the data:
 
 ```python
-from graflo.util.onto import Patterns, SparqlPattern
+from graflo.architecture.bindings import Bindings, SparqlConnector
 from pathlib import Path
 
 DATA_FILE = Path("data/data.ttl")
 
-patterns = Patterns()
+bindings = Bindings()
 
-patterns.add_sparql_pattern(
+bindings.add_sparql_connector(
     "Researcher",
-    SparqlPattern(
+    SparqlConnector(
         rdf_class="http://example.org/Researcher",
         rdf_file=DATA_FILE,
         resource_name="Researcher",
     ),
 )
 
-patterns.add_sparql_pattern(
+bindings.add_sparql_connector(
     "Publication",
-    SparqlPattern(
+    SparqlConnector(
         rdf_class="http://example.org/Publication",
         rdf_file=DATA_FILE,
         resource_name="Publication",
     ),
 )
 
-patterns.add_sparql_pattern(
+bindings.add_sparql_connector(
     "Institution",
-    SparqlPattern(
+    SparqlConnector(
         rdf_class="http://example.org/Institution",
         rdf_file=DATA_FILE,
         resource_name="Institution",
@@ -226,22 +229,22 @@ patterns.add_sparql_pattern(
 )
 ```
 
-Each `SparqlPattern` contains:
+Each `SparqlConnector` contains:
 
 | Field | Purpose |
 |---|---|
-| `rdf_class` | Full URI of the `rdf:Class` whose instances this pattern fetches |
+| `rdf_class` | Full URI of the `rdf:Class` whose instances this connector fetches |
 | `rdf_file` | Path to the local RDF file containing the instance data |
-| `resource_name` | Name of the graflo resource this pattern maps to |
+| `resource_name` | Name of the graflo resource this connector maps to |
 
 **Alternative: Remote SPARQL Endpoint**
 
 To read data from a SPARQL endpoint (e.g. Apache Fuseki) instead of a local file, replace `rdf_file` with `endpoint_url`:
 
 ```python
-patterns.add_sparql_pattern(
+bindings.add_sparql_connector(
     "Researcher",
-    SparqlPattern(
+    SparqlConnector(
         rdf_class="http://example.org/Researcher",
         endpoint_url="http://localhost:3030/dataset/sparql",
         resource_name="Researcher",
@@ -255,11 +258,15 @@ Finally, define the graph schema in the target database and ingest the data in o
 
 ```python
 from graflo.hq import IngestionParams
+from graflo.architecture.manifest import GraphManifest
 
 engine.define_and_ingest(
-    schema=schema,
+    manifest=GraphManifest(
+        graph_schema=schema,
+        ingestion_model=ingestion_model,
+        bindings=bindings,
+    ),
     target_db_config=conn_conf,
-    patterns=patterns,
     ingestion_params=IngestionParams(clear_data=True),
     recreate_schema=True,
 )
@@ -267,7 +274,7 @@ engine.define_and_ingest(
 
 **What happens during ingestion:**
 
-1. **Pattern resolution** — Each `SparqlPattern` is resolved: the local RDF file is parsed with `rdflib`, filtering triples by the specified `rdf:Class`
+1. **Connector resolution** — Each `SparqlConnector` is resolved: the local RDF file is parsed with `rdflib`, filtering triples by the specified `rdf:Class`
 2. **Flat dict conversion** — RDF triples are grouped by subject URI and converted to flat dictionaries (`{_key, _uri, field1, field2, ...}`)
 3. **Vertex creation** — For each resource, the corresponding flat dicts become vertices
 4. **Edge creation** — Object property values (URIs) are matched to target vertices, creating edges
@@ -281,7 +288,8 @@ from pathlib import Path
 
 from graflo.db.connection.onto import ArangoConfig
 from graflo.hq import GraphEngine, IngestionParams
-from graflo.util.onto import Patterns, SparqlPattern
+from graflo.architecture.manifest import GraphManifest
+from graflo.architecture.bindings import Bindings, SparqlConnector
 
 logging.basicConfig(level=logging.WARNING, handlers=[logging.StreamHandler()])
 logging.getLogger("graflo").setLevel(logging.DEBUG)
@@ -296,14 +304,17 @@ db_type = conn_conf.connection_type
 
 # Step 2: Infer schema from ontology
 engine = GraphEngine(target_db_flavor=db_type)
-schema = engine.infer_schema_from_rdf(source=ONTOLOGY_FILE, schema_name="academic_kg")
+schema, ingestion_model = engine.infer_schema_from_rdf(
+    source=ONTOLOGY_FILE,
+    schema_name="academic_kg",
+)
 
 # Step 3: Explicit resource mapping
-patterns = Patterns()
+bindings = Bindings()
 for cls_name in ("Researcher", "Publication", "Institution"):
-    patterns.add_sparql_pattern(
+    bindings.add_sparql_connector(
         cls_name,
-        SparqlPattern(
+        SparqlConnector(
             rdf_class=f"http://example.org/{cls_name}",
             rdf_file=DATA_FILE,
             resource_name=cls_name,
@@ -312,17 +323,20 @@ for cls_name in ("Researcher", "Publication", "Institution"):
 
 # Step 4: Define schema and ingest
 engine.define_and_ingest(
-    schema=schema,
+    manifest=GraphManifest(
+        graph_schema=schema,
+        ingestion_model=ingestion_model,
+        bindings=bindings,
+    ),
     target_db_config=conn_conf,
-    patterns=patterns,
     ingestion_params=IngestionParams(clear_data=True),
     recreate_schema=True,
 )
 
-print(f"Schema: {schema.general.name}")
-print(f"Vertices: {len(schema.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.edge_config.edges_list()))}")
-print(f"Resources: {len(schema.resources)}")
+print(f"Schema: {schema.metadata.name}")
+print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
+print(f"Edges: {len(list(schema.graph.edge_config.edges_list()))}")
+print(f"Resources: {len(ingestion_model.resources)}")
 ```
 
 ## How It Works
@@ -342,8 +356,8 @@ The ingestion pipeline converts RDF triples into graph elements:
 
 ```mermaid
 flowchart LR
-    A["ontology.ttl<br/>(TBox)"] -->|infer_schema_from_rdf| B["Schema<br/>(vertices, edges, resources)"]
-    C["data.ttl<br/>(ABox)"] -->|SparqlPattern + rdflib| D["Flat dicts per class"]
+    A["ontology.ttl<br/>(TBox)"] -->|infer_schema_from_rdf| B["Schema + IngestionModel"]
+    C["data.ttl<br/>(ABox)"] -->|SparqlConnector + rdflib| D["Flat dicts per class"]
     B --> E["define_and_ingest"]
     D --> E
     E --> F["Graph DB<br/>(ArangoDB / Neo4j / ...)"]
@@ -351,16 +365,16 @@ flowchart LR
 
 ## Key Concepts
 
-### Explicit vs Automatic Pattern Creation
+### Explicit vs Automatic Connector Creation
 
 | Approach | Method | Best for |
 |---|---|---|
-| **Explicit** (this example) | Build `SparqlPattern` objects by hand | Fine-grained control over class URIs, files, endpoints |
-| **Automatic** | `engine.create_patterns_from_rdf()` | Quick setup when ontology and data are co-located |
+| **Explicit** (this example) | Build `SparqlConnector` objects by hand | Fine-grained control over class URIs, files, endpoints |
+| **Automatic** | `engine.create_bindings_from_rdf()` | Quick setup when ontology and data are co-located |
 
-### SparqlPattern Modes
+### SparqlConnector Modes
 
-Each `SparqlPattern` can operate in one of two modes:
+Each `SparqlConnector` can operate in one of two modes:
 
 - **File mode** (`rdf_file` set) — Parses a local RDF file with `rdflib`, filtering by `rdf_class`
 - **Endpoint mode** (`endpoint_url` set) — Queries a remote SPARQL endpoint via `SPARQLWrapper`
@@ -370,8 +384,8 @@ These modes are mutually exclusive. Use file mode for small-to-medium datasets s
 ## Key Takeaways
 
 1. **OWL ontology inference** eliminates manual schema definition — `owl:Class` becomes vertices, `owl:DatatypeProperty` becomes fields, `owl:ObjectProperty` becomes edges
-2. **Explicit `SparqlPattern` mapping** gives full control over which class URI maps to which resource and data source
-3. **Local file and remote endpoint** modes are both supported via the same `SparqlPattern` abstraction
+2. **Explicit `SparqlConnector` mapping** gives full control over which class URI maps to which resource and data source
+3. **Local file and remote endpoint** modes are both supported via the same `SparqlConnector` abstraction
 4. **No intermediate formats** — RDF triples are converted directly to flat dicts and ingested into the graph database
 5. **Reusable ontology** — The same ontology file can drive schema inference for different data files or endpoints
 

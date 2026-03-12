@@ -2,8 +2,8 @@
 
 When a Resource's pipeline contains an EdgeActor whose edge has
 ``match_source`` / ``match_target``, and the source/target vertex types
-have known TablePatterns, this module can auto-generate JoinClauses and
-IS_NOT_NULL filters on the edge resource's TablePattern so that the
+have known table connectors, this module can auto-generate JoinClauses and
+IS_NOT_NULL filters on the edge resource's table connector so that the
 resulting SQL fetches fully resolved rows.
 """
 
@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING
 from graflo.architecture.actor import ActorWrapper, EdgeActor
 from graflo.architecture.resource import Resource
 from graflo.filter.onto import ComparisonOperator, FilterExpression
-from graflo.util.onto import JoinClause, TablePattern
+from graflo.architecture.bindings import JoinClause, TableConnector
 
 if TYPE_CHECKING:
     from graflo.architecture.vertex import VertexConfig
-    from graflo.util.onto import Bindings
+    from graflo.architecture.bindings import Bindings
 
 logger = logging.getLogger(__name__)
 
@@ -28,29 +28,29 @@ _SOURCE_ALIAS = "s"
 _TARGET_ALIAS = "t"
 
 
-def enrich_edge_pattern_with_joins(
+def enrich_edge_connector_with_joins(
     resource: Resource,
-    pattern: TablePattern,
-    patterns: Bindings,
+    connector: TableConnector,
+    bindings: Bindings,
     vertex_config: VertexConfig,
 ) -> None:
-    """Mutate *pattern* in-place, adding JoinClauses + IS_NOT_NULL filters.
+    """Mutate *connector* in-place, adding JoinClauses + IS_NOT_NULL filters.
 
     The function inspects the Resource's actor pipeline for EdgeActors and,
     for each edge that declares ``match_source`` **and** ``match_target``,
-    looks up the source / target vertex TablePatterns and primary keys to
+    looks up the source / target vertex table connectors and primary keys to
     construct LEFT JOINs and NOT-NULL guards.
 
-    If the pattern already has joins, this function is a no-op (the user
+    If the connector already has joins, this function is a no-op (the user
     provided explicit join specs).
 
     Args:
         resource: The Resource whose pipeline is inspected.
-        pattern: The TablePattern to enrich (mutated in-place).
-        patterns: The Bindings collection holding all vertex TablePatterns.
+        connector: The table connector to enrich (mutated in-place).
+        bindings: The Bindings collection holding all vertex table connectors.
         vertex_config: VertexConfig for looking up primary keys.
     """
-    if pattern.joins:
+    if connector.joins:
         return
 
     edge_actors = _collect_edge_actors(resource.root)
@@ -65,11 +65,11 @@ def enrich_edge_pattern_with_joins(
         if not edge.match_source or not edge.match_target:
             continue
 
-        source_info = _vertex_table_info(edge.source, patterns, vertex_config)
-        target_info = _vertex_table_info(edge.target, patterns, vertex_config)
+        source_info = _vertex_table_info(edge.source, bindings, vertex_config)
+        target_info = _vertex_table_info(edge.target, bindings, vertex_config)
         if source_info is None or target_info is None:
             logger.debug(
-                "Skipping auto-join for edge %s->%s: missing vertex pattern",
+                "Skipping auto-join for edge %s->%s: missing vertex connector",
                 edge.source,
                 edge.target,
             )
@@ -118,8 +118,8 @@ def enrich_edge_pattern_with_joins(
         )
 
     if new_joins:
-        pattern.joins = new_joins
-        pattern.filters = list(pattern.filters) + new_filters
+        connector.joins = new_joins
+        connector.filters = list(connector.filters) + new_filters
 
 
 # ------------------------------------------------------------------
@@ -143,9 +143,9 @@ def _vertex_table_info(
 ) -> tuple[str, str | None, str] | None:
     """Return (table_name, schema_name, primary_key_field) for a vertex.
 
-    Returns None if the vertex has no TablePattern in *patterns*.
+    Returns None if the vertex has no table connector in *patterns*.
     """
-    tp = patterns.table_patterns.get(vertex_name)
+    tp = patterns.table_connectors.get(vertex_name)
     if tp is None:
         return None
     try:

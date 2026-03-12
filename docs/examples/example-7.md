@@ -14,7 +14,7 @@ Instead of separate resources per entity type, this schema uses:
 1. **`vertex_router`** — Routes each objects row to the correct vertex type (`person`, `vehicle`, `institution`) via `type_map`
 2. **`edge_router`** — Creates edges with dynamic source/target types and relation names via `relation_map`
 
-This pattern is ideal for EAV-style or polymorphic data where one table holds multiple entity types and another holds relation tuples.
+This connector is ideal for EAV-style or polymorphic data where one table holds multiple entity types and another holds relation tuples.
 
 ## Data
 
@@ -149,29 +149,31 @@ import pathlib
 
 from suthing import FileHandle
 
-from graflo import Patterns, Schema
+from graflo import Bindings, GraphManifest
 from graflo.db import ArangoConfig
 from graflo.hq import GraphEngine
 from graflo.hq.caster import IngestionParams
-from graflo.util.onto import FilePattern
+from graflo.architecture.bindings import FileConnector
 
-schema_raw = FileHandle.load("schema.yaml")
-schema = Schema.from_config(schema_raw)
+manifest = GraphManifest.from_config(FileHandle.load("schema.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 conn_conf = ArangoConfig.from_docker_env()
 db_type = conn_conf.connection_type
 
-patterns = Patterns()
-patterns.add_file_pattern(
+bindings = Bindings()
+bindings.add_file_connector(
     "objects",
-    FilePattern(
+    FileConnector(
         regex=r"^objects\.csv$",
         sub_path=pathlib.Path("."),
         resource_name="objects",
     ),
 )
-patterns.add_file_pattern(
+bindings.add_file_connector(
     "relations",
-    FilePattern(
+    FileConnector(
         regex=r"^relations\.csv$",
         sub_path=pathlib.Path("."),
         resource_name="relations",
@@ -179,10 +181,11 @@ patterns.add_file_pattern(
 )
 
 engine = GraphEngine(target_db_flavor=db_type)
+ingest_manifest = manifest.model_copy(update={"bindings": bindings})
+ingest_manifest.finish_init()
 engine.define_and_ingest(
-    schema=schema,
+    manifest=ingest_manifest,
     target_db_config=conn_conf,
-    patterns=patterns,
     ingestion_params=IngestionParams(clear_data=True),
     recreate_schema=True,
 )

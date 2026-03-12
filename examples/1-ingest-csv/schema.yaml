@@ -1,24 +1,26 @@
-metadata:
-    name: hr
-graph:
-    vertex_config:
-        vertices:
-        -   name: person
-            fields:
-            -   id
-            -   name
-            -   age
-            identity:
-            -   id
-        -   name: department
-            fields:
-            -   name
-            identity:
-            -   name
-    edge_config:
-        edges:
-        -   source: person
-            target: department
+schema:
+    metadata:
+        name: hr
+    graph:
+        vertex_config:
+            vertices:
+            -   name: person
+                fields:
+                -   id
+                -   name
+                -   age
+                identity:
+                -   id
+            -   name: department
+                fields:
+                -   name
+                identity:
+                -   name
+        edge_config:
+            edges:
+            -   source: person
+                target: department
+    db_profile: {}
 ingestion_model:
     resources:
     -   resource_name: people
@@ -33,3 +35,4 @@ ingestion_model:
         -   vertex: department
             from:
                 name: department
+bindings: {}

@@ -7,6 +7,7 @@ This section provides detailed API documentation for all graflo components and m
 Core architectural components that define the graflo framework:
 
 - **[Schema](architecture/schema.md)**: Graph schema definition and management
+- **[GraphManifest](architecture/manifest.md)**: Canonical top-level config contract
 - **[Vertex](architecture/vertex.md)**: Vertex configuration and properties
 - **[Edge](architecture/edge.md)**: Edge configuration and relationship management
 - **[Resource](architecture/resource.md)**: Data source mapping and transformation

@@ -55,13 +55,12 @@ def _build_schema() -> Schema:
         graph=GraphModel(vertex_config=vertex_config, edge_config=edge_config),
         db_profile=DatabaseProfile(db_flavor=DBType.NEO4J),
     )
-    schema.bind_ingestion_model(IngestionModel(resources=[]))
     return schema
 
 
-def _require_ingestion_model(schema: Schema) -> IngestionModel:
-    ingestion_model = schema.ingestion_model
-    assert ingestion_model is not None
+def _build_ingestion_model(schema: Schema) -> IngestionModel:
+    ingestion_model = IngestionModel(resources=[])
+    ingestion_model.finish_init(schema.graph)
     return ingestion_model
 
 
@@ -69,7 +68,7 @@ def test_push_vertices_blank_uses_python_generated_identity(monkeypatch):
     schema = _build_schema()
     writer = DBWriter(
         schema=schema,
-        ingestion_model=_require_ingestion_model(schema),
+        ingestion_model=_build_ingestion_model(schema),
         dry=False,
         max_concurrent=1,
     )
@@ -89,7 +88,7 @@ def test_resolve_blank_edges_prefers_identity_join_over_zip():
     schema = _build_schema()
     writer = DBWriter(
         schema=schema,
-        ingestion_model=_require_ingestion_model(schema),
+        ingestion_model=_build_ingestion_model(schema),
         dry=False,
         max_concurrent=1,
     )

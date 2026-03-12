@@ -1,44 +1,45 @@
-metadata:
-    name: tigergraph-sanitize-edges
-graph:
-    vertex_config:
-        vertices:
-        -   name: parcel
-            fields:
-            -   name: id
-                type: INT
-            identity:
-            -   id
-        -   name: box
-            fields:
-            -   name: id
-                type: INT
-            identity:
-            -   id
-        -   name: container
-            fields:
-            -   name
-            identity:
-            -   name
-    edge_config:
-        edges:
-        -   source: box
-            target: parcel
-            relation: contains
-        -   source: box
-            target: box
-            relation: contains
-        -   source: container
-            target: box
-            relation: contains
-        -   source: container
-            target: container
-            relation: package
-        -   source: container
-            target: container
-            relation: box
-db_profile:
-    db_flavor: tigergraph
+schema:
+    metadata:
+        name: tigergraph-sanitize-edges
+    graph:
+        vertex_config:
+            vertices:
+            -   name: parcel
+                fields:
+                -   name: id
+                    type: INT
+                identity:
+                -   id
+            -   name: box
+                fields:
+                -   name: id
+                    type: INT
+                identity:
+                -   id
+            -   name: container
+                fields:
+                -   name
+                identity:
+                -   name
+        edge_config:
+            edges:
+            -   source: box
+                target: parcel
+                relation: contains
+            -   source: box
+                target: box
+                relation: contains
+            -   source: container
+                target: box
+                relation: contains
+            -   source: container
+                target: container
+                relation: package
+            -   source: container
+                target: container
+                relation: box
+    db_profile:
+        db_flavor: tigergraph
 ingestion_model:
     resources:
     -   resource_name: parcels
@@ -56,3 +57,4 @@ ingestion_model:
         -   vertex: container
         -   map:
                 container_name: name
+bindings: {}

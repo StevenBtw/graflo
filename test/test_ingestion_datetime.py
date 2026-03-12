@@ -2,7 +2,7 @@
 
 from graflo.filter.sql import datetime_range_where_sql
 from graflo.hq.caster import IngestionParams
-from graflo.util.onto import TablePattern
+from graflo.architecture.bindings import TableConnector
 
 
 def test_ingestion_params_datetime_defaults():
@@ -67,20 +67,20 @@ def test_datetime_range_where_sql_iso_format():
     assert "updated_at" in out
 
 
-def test_sql_query_where_combines_pattern_and_ingestion_datetime():
-    """Query WHERE combines TablePattern date_filter and ingestion datetime range."""
-    pattern = TablePattern(
+def test_sql_query_where_combines_connector_and_ingestion_datetime():
+    """Query WHERE combines TableConnector date_filter and ingestion datetime range."""
+    connector = TableConnector(
         table_name="events",
         date_field="dt",
         date_filter="!= '2020-01-01'",
     )
-    pattern_where = pattern.build_where_clause()
+    connector_where = connector.build_where_clause()
     dt_where = datetime_range_where_sql(
         "2020-06-01",
         "2020-07-01",
-        pattern.date_field or "dt",
+        connector.date_field or "dt",
     )
-    where_parts = [p for p in [pattern_where, dt_where] if p]
+    where_parts = [p for p in [connector_where, dt_where] if p]
     combined = " AND ".join(where_parts)
     assert "\"dt\" != '2020-01-01'" in combined
     assert "\"dt\" >= '2020-06-01'" in combined

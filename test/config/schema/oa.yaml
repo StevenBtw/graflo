@@ -1,30 +1,31 @@
-metadata:
-    name: openalex
-graph:
-    vertex_config:
-        vertices:
-        -   name: author
-            fields:
-            -   _key
-            identity:
-            -   _key
-        -   name: institution
-            fields:
-            -   _key
-            identity:
-            -   _key
-        -   name: work
-            fields:
-            -   _key
-            -   doi
-            identity:
-            -   _key
-    edge_config: []
-db_profile:
-    vertex_storage_names:
-        author: authors
-        institution: institutions
-        work: works
+schema:
+    metadata:
+        name: openalex
+    graph:
+        vertex_config:
+            vertices:
+            -   name: author
+                fields:
+                -   _key
+                identity:
+                -   _key
+            -   name: institution
+                fields:
+                -   _key
+                identity:
+                -   _key
+            -   name: work
+                fields:
+                -   _key
+                -   doi
+                identity:
+                -   _key
+        edge_config: []
+    db_profile:
+        vertex_storage_names:
+            author: authors
+            institution: institutions
+            work: works
 ingestion_model:
     resources:
         tree_likes:
@@ -79,3 +80,4 @@ ingestion_model:
             -   id
             output:
             -   _key
+bindings: {}

@@ -15,13 +15,15 @@ from sqlalchemy import create_engine, text
 from graflo.architecture.schema import IngestionModel, Schema
 from graflo.data_source.sql import SQLConfig, SQLDataSource
 from graflo.filter.onto import ComparisonOperator, FilterExpression
-from graflo.util.onto import TablePattern
-from graflo.hq.auto_join import enrich_edge_pattern_with_joins
-from graflo.util.onto import Bindings
+from graflo.architecture.bindings import TableConnector
+from graflo.hq.auto_join import enrich_edge_connector_with_joins
+from graflo.architecture.bindings import Bindings
+
+_INGESTION_BY_SCHEMA_ID: dict[int, IngestionModel] = {}
 
 
 def _bound_ingestion_model(schema: Schema) -> IngestionModel:
-    ingestion_model = schema.ingestion_model
+    ingestion_model = _INGESTION_BY_SCHEMA_ID.get(id(schema))
     assert ingestion_model is not None
     return ingestion_model
 
@@ -45,7 +47,8 @@ def _build_bound_schema(
         }
     )
     ingestion_model = IngestionModel.model_validate({"resources": resources})
-    schema.bind_ingestion_model(ingestion_model)
+    ingestion_model.finish_init(schema.graph)
+    _INGESTION_BY_SCHEMA_ID[id(schema)] = ingestion_model
     return schema
 
 
@@ -133,7 +136,7 @@ class TestFilteredVertexResources:
             cmp_operator=ComparisonOperator.EQ,
             value=["server"],
         )
-        tp_server = TablePattern(
+        tp_server = TableConnector(
             table_name="classes",
             filters=[f_server],
         )
@@ -145,7 +148,7 @@ class TestFilteredVertexResources:
             cmp_operator=ComparisonOperator.EQ,
             value=["database"],
         )
-        tp_db = TablePattern(
+        tp_db = TableConnector(
             table_name="classes",
             filters=[f_db],
         )
@@ -199,7 +202,7 @@ class TestFilteredVertexResources:
             cmp_operator=ComparisonOperator.EQ,
             value=["server"],
         )
-        tp = TablePattern(table_name="classes", filters=[f])
+        tp = TableConnector(table_name="classes", filters=[f])
         where = tp.build_where_clause()
         assert "\"class_name\" = 'server'" in where
 
@@ -273,20 +276,20 @@ class TestEdgeResourceAutoJoin:
         schema = self._build_schema()
         resource = _bound_ingestion_model(schema).fetch_resource("relations")
 
-        tp_edge = TablePattern(table_name="relations", schema_name="main")
+        tp_edge = TableConnector(table_name="relations", schema_name="main")
         patterns_table = {
-            "server": TablePattern(table_name="classes", schema_name="main"),
-            "database": TablePattern(table_name="classes", schema_name="main"),
-            "network": TablePattern(table_name="classes", schema_name="main"),
+            "server": TableConnector(table_name="classes", schema_name="main"),
+            "database": TableConnector(table_name="classes", schema_name="main"),
+            "network": TableConnector(table_name="classes", schema_name="main"),
             "relations": tp_edge,
         }
 
-        patterns = Bindings(table_patterns=patterns_table)
+        patterns = Bindings(table_connectors=patterns_table)
 
-        enrich_edge_pattern_with_joins(
+        enrich_edge_connector_with_joins(
             resource=resource,
-            pattern=tp_edge,
-            patterns=patterns,
+            connector=tp_edge,
+            bindings=patterns,
             vertex_config=schema.graph.vertex_config,
         )
 
@@ -299,26 +302,26 @@ class TestEdgeResourceAutoJoin:
 
     def test_auto_join_query_executes_on_sqlite(self):
         """Run the generated JOIN query against a real SQLite DB."""
-        from graflo.hq.auto_join import enrich_edge_pattern_with_joins
-        from graflo.util.onto import Bindings
+        from graflo.hq.auto_join import enrich_edge_connector_with_joins
+        from graflo.architecture.bindings import Bindings
 
         conn_str = _setup_db()
         schema = self._build_schema()
         resource = _bound_ingestion_model(schema).fetch_resource("relations")
 
-        tp_edge = TablePattern(table_name="relations")
+        tp_edge = TableConnector(table_name="relations")
         patterns_table = {
-            "server": TablePattern(table_name="classes"),
-            "database": TablePattern(table_name="classes"),
-            "network": TablePattern(table_name="classes"),
+            "server": TableConnector(table_name="classes"),
+            "database": TableConnector(table_name="classes"),
+            "network": TableConnector(table_name="classes"),
             "relations": tp_edge,
         }
-        patterns = Bindings(table_patterns=patterns_table)
+        bindings = Bindings(table_connectors=patterns_table)
 
-        enrich_edge_pattern_with_joins(
+        enrich_edge_connector_with_joins(
             resource=resource,
-            pattern=tp_edge,
-            patterns=patterns,
+            connector=tp_edge,
+            bindings=bindings,
             vertex_config=schema.graph.vertex_config,
         )
 

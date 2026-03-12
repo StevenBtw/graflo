@@ -1,138 +1,139 @@
-metadata:
-    name: kg
-    version: 3.0.0
-graph:
-    vertex_config:
-        vertices:
-        -   name: publication
-            fields:
-            -   arxiv
-            -   doi
-            -   created
-            -   data_source
-            identity:
-            -   arxiv
-            -   doi
-        -   name: entity
-            fields:
-            -   linker_type
-            -   ent_db_type
-            -   id
-            -   ent_type
-            -   original_form
-            -   description
-            identity:
-            -   _key
-        -   name: mention
-            fields:
-            -   text
-            identity:
-            -   _key
-        -   name: community
-            fields:
-            -   obs_date
-            -   t_window
-            -   comm_id
-            -   size
-            identity:
-            -   obs_date
-            -   t_window
-            -   comm_id
-    edge_config:
-        edges:
-        -   source: entity
-            target: entity
-            identities:
-            -   -   source
-                -   target
-                -   publication@_id
-            weights:
-                direct:
-                -   publication@_id
+schema:
+    metadata:
+        name: kg
+        version: 3.0.0
+    graph:
+        vertex_config:
+            vertices:
+            -   name: publication
+                fields:
+                -   arxiv
+                -   doi
+                -   created
+                -   data_source
+                identity:
+                -   arxiv
+                -   doi
+            -   name: entity
+                fields:
+                -   linker_type
+                -   ent_db_type
+                -   id
+                -   ent_type
+                -   original_form
+                -   description
+                identity:
+                -   _key
+            -   name: mention
+                fields:
+                -   text
+                identity:
+                -   _key
+            -   name: community
+                fields:
                 -   obs_date
                 -   t_window
+                -   comm_id
+                -   size
+                identity:
+                -   obs_date
+                -   t_window
+                -   comm_id
+        edge_config:
+            edges:
+            -   source: entity
+                target: entity
+                identities:
+                -   -   source
+                    -   target
+                    -   publication@_id
+                weights:
+                    direct:
+                    -   publication@_id
+                    -   obs_date
+                    -   t_window
+            -   source: mention
+                target: entity
+            -   source: entity
+                target: community
+            -   source: community
+                target: community
+    db_profile:
+        vertex_storage_names:
+            publication: publications
+            entity: entities
+            mention: mentions
+            community: communities
+        vertex_indexes:
+            publication:
+            -   unique: false
+                fields:
+                -   created
+            -   unique: false
+                fields:
+                -   created
+            entity:
+            -   fields:
+                -   id
+                -   ent_type
+            -   fields:
+                -   id
+                -   ent_db_type
+            mention:
+            -   unique: false
+                fields:
+                -   text
+        edge_specs:
+        -   source: entity
+            target: entity
+            purpose:
+            indexes:
+            -   fields:
+                -   _from
+                -   _to
+                -   publication@_id
+            -   fields:
+                -   publication@_id
+                unique: false
+        -   source: entity
+            target: entity
+            purpose: tmp
+        -   source: entity
+            target: entity
+            purpose: redux
+        -   source: entity
+            target: entity
+            purpose: convolution
+            indexes_mode: replace
+            indexes:
+            -   fields:
+                -   _from
+                -   _to
+                -   obs_date
+                -   t_window
+            -   fields:
+                -   obs_date
+                -   t_window
+                unique: false
         -   source: mention
             target: entity
-        -   source: entity
-            target: community
-        -   source: community
-            target: community
-db_profile:
-    vertex_storage_names:
-        publication: publications
-        entity: entities
-        mention: mentions
-        community: communities
-    vertex_indexes:
-        publication:
-        -   unique: false
-            fields:
-            -   created
-        -   unique: false
-            fields:
-            -   created
-        entity:
-        -   fields:
-            -   id
-            -   ent_type
-        -   fields:
-            -   id
-            -   ent_db_type
-        mention:
-        -   unique: false
-            fields:
-            -   text
-    edge_specs:
-    -   source: entity
-        target: entity
-        purpose:
-        indexes:
-        -   fields:
-            -   _from
-            -   _to
-            -   publication@_id
-        -   fields:
-            -   publication@_id
-            unique: false
-    -   source: entity
-        target: entity
-        purpose: tmp
-    -   source: entity
-        target: entity
-        purpose: redux
-    -   source: entity
-        target: entity
-        purpose: convolution
-        indexes_mode: replace
-        indexes:
-        -   fields:
-            -   _from
-            -   _to
-            -   obs_date
-            -   t_window
-        -   fields:
-            -   obs_date
-            -   t_window
-            unique: false
-    -   source: mention
-        target: entity
-        purpose:
-        indexes:
-        -   fields:
-            -   _from
-            -   _to
-            -   publication@_id
-        -   fields:
-            -   publication@_id
-            unique: false
-    -   source: mention
-        target: mention
-        purpose:
-        indexes:
-        -   fields:
-            -   _from
-            -   _to
-            -   _role
+            purpose:
+            indexes:
+            -   fields:
+                -   _from
+                -   _to
+                -   publication@_id
+            -   fields:
+                -   publication@_id
+                unique: false
+        -   source: mention
+            target: mention
+            purpose:
+            indexes:
+            -   fields:
+                -   _from
+                -   _to
+                -   _role
 ingestion_model:
     resources:
     -   resource_name: kg
@@ -197,3 +198,4 @@ ingestion_model:
         -   key: community
             apply:
             -   vertex: community
+bindings: {}

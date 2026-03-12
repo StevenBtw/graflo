@@ -3,7 +3,7 @@ import logging
 import os
 import pathlib
 from os.path import dirname, realpath
-from test.conftest import verify
+from test.conftest import fetch_manifest_obj, verify
 
 import pytest
 from suthing import FileHandle
@@ -11,12 +11,6 @@ from suthing import FileHandle
 from graflo.hq.caster import Caster
 
 logger = logging.getLogger(__name__)
-
-
-def _require_ingestion_model(schema):
-    ingestion_model = schema.ingestion_model
-    assert ingestion_model is not None
-    return ingestion_model
 
 
 @pytest.fixture()
@@ -29,11 +23,13 @@ def modes():
     return [("kg", "json"), ("ibes", "csv")]
 
 
-def cast(modes, schema_obj, current_path, level, reset, n_cores=1):
+def cast(modes, current_path, level, reset, n_cores=1):
     for mode, ext in modes:
         # work with main resource
         resource_name = mode.split("_")[0]
-        schema = schema_obj(mode)
+        manifest = fetch_manifest_obj(mode)
+        schema = manifest.require_schema()
+        ingestion_model = manifest.require_ingestion_model()
 
         # Create the directory if it doesn't exist
         output_dir = "test/figs"
@@ -43,14 +39,14 @@ def cast(modes, schema_obj, current_path, level, reset, n_cores=1):
         try:
             from graflo.plot.plotter import assemble_tree
 
-            for r in schema.ingestion_model.resources:
+            for r in ingestion_model.resources:
                 assemble_tree(
                     r.root, f"{output_dir}/{mode}.resource-{r.resource_name}.pdf"
                 )
         except ImportError:
             # graphviz/pygraphviz not available, skip visualization
             logger.debug("graphviz not available, skipping tree visualization")
-        caster = Caster(schema, _require_ingestion_model(schema), n_cores=n_cores)
+        caster = Caster(schema, ingestion_model, n_cores=n_cores)
 
         if level == 0:
             fname = os.path.join(
@@ -94,8 +90,8 @@ def cast(modes, schema_obj, current_path, level, reset, n_cores=1):
                 )
 
 
-def test_cast(modes, schema_obj, current_path, reset):
-    cast(modes, schema_obj, current_path, level=0, reset=reset)
-    cast(modes, schema_obj, current_path, level=1, reset=reset)
-    cast(modes, schema_obj, current_path, level=2, reset=reset)
-    cast(modes, schema_obj, current_path, level=2, reset=reset, n_cores=4)
+def test_cast(modes, current_path, reset):
+    cast(modes, current_path, level=0, reset=reset)
+    cast(modes, current_path, level=1, reset=reset)
+    cast(modes, current_path, level=2, reset=reset)
+    cast(modes, current_path, level=2, reset=reset, n_cores=4)

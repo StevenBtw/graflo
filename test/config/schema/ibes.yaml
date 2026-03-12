@@ -1,82 +1,83 @@
-metadata:
-    name: ibes
-graph:
-    vertex_config:
-        blank_vertices:
-        -   publication
-        vertices:
-        -   name: publication
-            fields:
-            -   datetime_review
-            -   datetime_announce
-            identity:
-            -   _key
-        -   name: ticker
-            fields:
-            -   cusip
-            -   cname
-            -   oftic
-            identity:
-            -   cusip
-            -   cname
-            -   oftic
-        -   name: agency
-            fields:
-            -   aname
-            identity:
-            -   aname
-        -   name: analyst
-            fields:
-            -   last_name
-            -   initial
-            identity:
-            -   last_name
-            -   initial
-        -   name: recommendation
-            fields:
-            -   erec
-            -   etext
-            -   irec
-            -   itext
-            identity:
-            -   irec
-            -   erec
-            -   etext
-            -   itext
-    edge_config:
-        edges:
-        -   source: publication
-            target: ticker
-        -   source: analyst
-            target: agency
-            weights:
-                vertices:
-                -   name: publication
-                    keep_vertex_name: false
-                    fields:
-                    -   datetime_review
-                    -   datetime_announce
-        -   source: analyst
-            target: publication
-        -   source: publication
-            target: recommendation
-db_profile:
-    vertex_storage_names:
-        publication: publications
-        ticker: tickers
-        agency: agencies
-        analyst: analysts
-        recommendation: recommendations
-    vertex_indexes:
-        publication:
-        -   type: hash
-            unique: false
-            fields:
-            -   datetime_review
-        -   type: hash
-            unique: false
-            fields:
-            -   datetime_announce
+schema:
+    metadata:
+        name: ibes
+    graph:
+        vertex_config:
+            blank_vertices:
+            -   publication
+            vertices:
+            -   name: publication
+                fields:
+                -   datetime_review
+                -   datetime_announce
+                identity:
+                -   _key
+            -   name: ticker
+                fields:
+                -   cusip
+                -   cname
+                -   oftic
+                identity:
+                -   cusip
+                -   cname
+                -   oftic
+            -   name: agency
+                fields:
+                -   aname
+                identity:
+                -   aname
+            -   name: analyst
+                fields:
+                -   last_name
+                -   initial
+                identity:
+                -   last_name
+                -   initial
+            -   name: recommendation
+                fields:
+                -   erec
+                -   etext
+                -   irec
+                -   itext
+                identity:
+                -   irec
+                -   erec
+                -   etext
+                -   itext
+        edge_config:
+            edges:
+            -   source: publication
+                target: ticker
+            -   source: analyst
+                target: agency
+                weights:
+                    vertices:
+                    -   name: publication
+                        keep_vertex_name: false
+                        fields:
+                        -   datetime_review
+                        -   datetime_announce
+            -   source: analyst
+                target: publication
+            -   source: publication
+                target: recommendation
+    db_profile:
+        vertex_storage_names:
+            publication: publications
+            ticker: tickers
+            agency: agencies
+            analyst: analysts
+            recommendation: recommendations
+        vertex_indexes:
+            publication:
+            -   type: hash
+                unique: false
+                fields:
+                -   datetime_review
+            -   type: hash
+                unique: false
+                fields:
+                -   datetime_announce
 ingestion_model:
     resources:
     -   resource_name: ibes
@@ -119,3 +120,4 @@ ingestion_model:
                 IRECCD: irec
                 ITEXT: itext
         -   vertex: publication
+bindings: {}

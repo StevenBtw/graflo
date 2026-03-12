@@ -159,6 +159,7 @@ source = DataSourceFactory.create_sql_data_source(config)
 ### Using with Caster
 
 ```python
+import asyncio
 from graflo import Caster, DataSourceRegistry
 from graflo.hq.caster import IngestionParams
 
@@ -166,17 +167,19 @@ registry = DataSourceRegistry()
 registry.register(file_source, resource_name="users")
 registry.register(api_source, resource_name="users")  # Multiple sources for same resource
 
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 
 ingestion_params = IngestionParams(
     batch_size=1000,  # Process 1000 items per batch
-    recreate_schema=False,  # Set to True to drop and redefine schema
+    clear_data=False,
 )
 
-caster.ingest_data_sources(
-    data_source_registry=registry,
-    conn_conf=conn_conf,
-    ingestion_params=ingestion_params,
+asyncio.run(
+    caster.ingest_data_sources(
+        data_source_registry=registry,
+        conn_conf=conn_conf,
+        ingestion_params=ingestion_params,
+    )
 )
 ```
 

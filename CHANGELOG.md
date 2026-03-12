@@ -31,11 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **SelectSpec**: Declarative view specification for advanced filtering and projection of data before feeding into Resources
-  - Alternative to `TablePattern`'s `table_name` + `joins` + `filters`; use `view: SelectSpec` for full control over the SQL query
+  - Alternative to `TableConnector`'s `table_name` + `joins` + `filters`; use `view: SelectSpec` for full control over the SQL query
   - Two modes: `kind="select"` (full SQL-like spec with `from`, `joins`, `select`, `where`) and `kind="type_lookup"` (shorthand for edge tables where source/target types come from a lookup table via FK joins)
   - `type_lookup` shorthand: specify `table`, `identity`, `type_column`, `source`, `target`, and optional `relation` to auto-build JOINs that resolve entity types from a discriminator table
   - `FilterExpression`-based `where` clause support; YAML/JSON loading via `SelectSpec.from_dict()`
-  - Used by `TablePattern.view` and by `ResourceMapper.create_patterns_from_postgres()` for edge tables with type lookup metadata
+  - Used by `TableConnector.view` and by `ResourceMapper.create_bindings_from_postgres()` for edge tables with type lookup metadata
 - **VertexRouterActor and EdgeRouterActor**: New router actors for dynamic type-based routing in resource pipelines
   - `VertexRouterActor` routes documents to the correct `VertexActor` based on a `type_field` in the document (with optional `type_map`, `prefix`, `field_map`, `vertex_from_map`)
   - `EdgeRouterActor` creates edges with dynamic source/target types from `source_type_field` and `target_type_field`, plus optional `relation_field` or static `relation` (with `type_map`, `relation_map`, `source_fields`, `target_fields`)
@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated docs and concepts to describe VertexRouter and EdgeRouter actor types
 - Added `vertex_router` and `edge_router` step examples to creating-schema guide
 - Schema architecture diagram now includes VertexRouterActor and EdgeRouterActor in the Actor hierarchy
-- Added SelectSpec documentation: filter view reference, TablePattern `view` usage in creating-schema guide, and Key Features mention
+- Added SelectSpec documentation: filter view reference, TableConnector `view` usage in creating-schema guide, and Key Features mention
 
 ## [1.6.5] - 2026-03-02
 
@@ -189,12 +189,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **SPARQL / RDF resource support**: Ingest data from SPARQL endpoints (e.g. Apache Fuseki) and local RDF files (`.ttl`, `.rdf`, `.n3`, `.jsonld`) into property graphs
-  - New `SparqlPattern` for mapping `rdf:Class` instances to resources, alongside existing `FilePattern` and `TablePattern`
+  - New `SparqlConnector` for mapping `rdf:Class` instances to resources, alongside existing `FileConnector` and `TableConnector`
   - New `RdfDataSource` abstract parent with shared RDF-to-dict conversion logic; concrete subclasses `RdfFileDataSource` (local files via rdflib) and `SparqlEndpointDataSource` (remote endpoints via SPARQLWrapper)
   - New `SparqlEndpointConfig` (extends `DBConfig`) with `from_docker_env()` for Fuseki containers
   - New `RdfInferenceManager` auto-infers graflo `Schema` from OWL/RDFS ontologies: `owl:Class` to vertices, `owl:DatatypeProperty` to fields, `owl:ObjectProperty` to edges
-  - `GraphEngine.infer_schema_from_rdf()` and `GraphEngine.create_patterns_from_rdf()` for the RDF inference workflow
-  - `Patterns` class extended with `sparql_patterns` and `sparql_configs` dicts
+  - `GraphEngine.infer_schema_from_rdf()` and `GraphEngine.create_bindings_from_rdf()` for the RDF inference workflow
+  - `Bindings` class extended with `sparql_connectors` and `sparql_configs` dicts
   - `RegistryBuilder` handles `ResourceType.SPARQL` to create the appropriate data sources
   - `ResourceType.SPARQL`, `DataSourceType.SPARQL`, `DBType.SPARQL` enum values
   - `rdflib` and `SPARQLWrapper` available as the `sparql` optional extra (`pip install graflo[sparql]`)
@@ -211,7 +211,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`graflo.filter` package exports**: `FilterExpression`, `ComparisonOperator`, and `LogicalOperator` are now re-exported from `graflo.filter.__init__` (previously only available via `graflo.filter.onto`)
 
 ### Documentation
-- Added data-flow diagram (Pattern -> DataSource -> Resource -> GraphContainer -> Target DB) to Concepts page
+- Added data-flow diagram (Connector -> DataSource -> Resource -> GraphContainer -> Target DB) to Concepts page
 - Added **Mermaid class diagrams** to Concepts page showing:
   - `GraphEngine` orchestration: how `GraphEngine` delegates to `InferenceManager`, `ResourceMapper`, `Caster`, and `ConnectionManager`
   - `Schema` architecture: the full hierarchy from `Schema` through `VertexConfig`/`EdgeConfig`, `Resource`, `Actor` subtypes, `Field`, and `FilterExpression`
@@ -223,7 +223,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Ingestion date range**: `IngestionParams` supports `datetime_after`, `datetime_before`, and `datetime_column` so ingestion can be restricted to a date range
-  - Use with `GraphEngine.create_patterns(..., datetime_columns={...})` for per-resource datetime columns, or set `IngestionParams.datetime_column` for a single default column
+  - Use with `GraphEngine.create_bindings(..., datetime_columns={...})` for per-resource datetime columns, or set `IngestionParams.datetime_column` for a single default column
   - Rows are included when the datetime column value is in `[datetime_after, datetime_before)` (inclusive lower, exclusive upper)
   - Applies to SQL/PostgreSQL table ingestion; enables sampling or incremental loads by time window
 
@@ -261,8 +261,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Used by SchemaSanitizer to store sanitized relation names for TigerGraph compatibility
   - Supports setter for updating the database-specific relation name
 - **GraphEngine orchestrator**: Added `GraphEngine` class as the main orchestrator for graph database operations
-  - Coordinates schema inference, pattern creation, and data ingestion workflows
-  - Provides unified interface: `infer_schema()`, `create_patterns()`, and `ingest()` methods
+  - Coordinates schema inference, connector creation, and data ingestion workflows
+  - Provides unified interface: `infer_schema()`, `create_bindings()`, and `ingest()` methods
   - Integrates `InferenceManager`, `ResourceMapper`, and `Caster` components
   - Supports target database flavor configuration for schema sanitization
   - Located in `graflo.hq.graph_engine` module
@@ -609,7 +609,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **File Discovery Path Bug**: Fixed incorrect path combination in `Caster.discover_files()`
   - Previously combined `fpath` with `pattern.sub_path` again, causing `data/data` errors
   - Now correctly uses `fpath` directly as the search directory
-  - Fixes `FileNotFoundError` when using `FilePattern` with `sub_path` in ingestion
+  - Fixes `FileNotFoundError` when using `FileConnector` with `sub_path` in ingestion
 
 ## [1.2.1] - 2025-01-XX
 

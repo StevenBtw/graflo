@@ -43,7 +43,7 @@ Graph Topology:
 
 Performance & DoS:
     - Memory exhaustion attempts (exponential growth)
-    - ReDoS pattern storage and filtering
+    - ReDoS connector storage and filtering
     - Query complexity attacks (UNION bombs, WITH chains)
 
 Usage
@@ -107,7 +107,7 @@ class TestCypherInjection:
     ):
         """Verify property values cannot escape string context to inject Cypher.
 
-        Attempts classic injection patterns adapted from SQL injection,
+        Attempts classic injection connectors adapted from SQL injection,
         including quote escaping, comment injection, and UNION-based attacks.
         """
         _ = clean_db
@@ -648,7 +648,7 @@ class TestPathologicalGraphs:
     algorithmic edge cases. These structures test the connector's
     ability to handle complex topologies gracefully.
 
-    Patterns tested:
+    Connectors tested:
         - Self-loops (node connected to itself)
         - Bidirectional edges (mutual relationships)
         - Multi-edges (multiple edges between same nodes)

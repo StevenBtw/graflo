@@ -1,24 +1,25 @@
-metadata:
-    name: openalex
-graph:
-    vertex_config:
-        vertices:
-        -   name: work
-            fields:
-            -   _key
-            -   doi
-            -   title
-            -   created_date
-            identity:
-            -   _key
-    edge_config:
-        edges: []
-db_profile:
-    vertex_indexes:
-        work:
-        -   unique: false
-            fields:
-            -   doi
+schema:
+    metadata:
+        name: openalex
+    graph:
+        vertex_config:
+            vertices:
+            -   name: work
+                fields:
+                -   _key
+                -   doi
+                -   title
+                -   created_date
+                identity:
+                -   _key
+        edge_config:
+            edges: []
+    db_profile:
+        vertex_indexes:
+            work:
+            -   unique: false
+                fields:
+                -   doi
 ingestion_model:
     resources:
     -   resource_name: work
@@ -52,3 +53,4 @@ ingestion_model:
             -   id
             output:
             -   _key
+bindings: {}

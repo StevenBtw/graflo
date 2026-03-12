@@ -1,5 +1,5 @@
 from suthing import FileHandle
-from graflo import Bindings, IngestionModel, Schema
+from graflo import Bindings, GraphManifest
 from graflo.db import Neo4jConfig
 from graflo.hq import GraphEngine
 from graflo.hq.caster import IngestionParams
@@ -12,9 +12,10 @@ logging.basicConfig(level=logging.WARNING, handlers=[logging.StreamHandler()])
 # Set graflo module to INFO level
 logging.getLogger("graflo").setLevel(logging.DEBUG)
 
-schema_raw = FileHandle.load("schema.yaml")
-schema = Schema.from_config(schema_raw)
-ingestion_model = IngestionModel.from_config(schema_raw)
+manifest = GraphManifest.from_config(FileHandle.load("schema.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Load config from docker/neo4j/.env (recommended)
 # This automatically reads NEO4J_BOLT_PORT, NEO4J_AUTH, etc.
@@ -37,26 +38,26 @@ conn_conf = Neo4jConfig.from_docker_env()
 # Determine DB type from connection config
 db_type = conn_conf.connection_type
 
-# Load patterns from YAML file (same pattern as Schema)
+# Load connectors from YAML file (same approach as Schema)
 bindings = Bindings.from_dict(FileHandle.load("patterns.yaml"))
 
-# Alternative: Create patterns programmatically
-# from graflo.util.onto import FilePattern
+# Alternative: Create connectors programmatically
+# from graflo.util.onto import FileConnector
 # import pathlib
 # bindings = Bindings()
-# patterns.add_file_pattern(
+# bindings.add_file_connector(
 #     "relations",
-#     FilePattern(regex="^relations.*\.csv$", sub_path=pathlib.Path("."), resource_name="relations")
+#     FileConnector(regex="^relations.*\.csv$", sub_path=pathlib.Path("."), resource_name="relations")
 # )
 
 # Create GraphEngine and define schema + ingest in one operation
 engine = GraphEngine(target_db_flavor=db_type)
 ingestion_params = IngestionParams(clear_data=True)
+manifest = manifest.model_copy(update={"bindings": bindings})
+manifest.finish_init()
 engine.define_and_ingest(
-    schema=schema,
+    manifest=manifest,
     target_db_config=conn_conf,
-    ingestion_model=ingestion_model,
-    bindings=bindings,
     ingestion_params=ingestion_params,
     recreate_schema=True,
 )

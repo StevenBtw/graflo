@@ -9,6 +9,7 @@ This module tests the schema inference capabilities, including:
 
 from unittest.mock import patch
 
+from graflo.architecture.manifest import GraphManifest
 from graflo.hq import GraphEngine
 from graflo.onto import DBType
 
@@ -18,7 +19,9 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
     _ = load_mock_schema  # Ensure schema is loaded
 
     engine = GraphEngine(target_db_flavor=DBType.ARANGO)
-    schema, ingestion_model = engine.infer_schema(conn_conf, schema_name="public")
+    manifest = engine.infer_schema(conn_conf, schema_name="public")
+    schema = manifest.require_schema()
+    ingestion_model = manifest.require_ingestion_model()
 
     # Verify schema structure
     assert schema is not None
@@ -168,6 +171,22 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
     print("=" * 80)
 
 
+def test_infer_schema_returns_manifest(conn_conf, load_mock_schema):
+    """Test that infer_schema returns a GraphManifest with inferred blocks."""
+    _ = load_mock_schema  # Ensure schema is loaded
+
+    engine = GraphEngine(target_db_flavor=DBType.ARANGO)
+    manifest = engine.infer_schema(conn_conf, schema_name="public")
+
+    assert isinstance(manifest, GraphManifest)
+    schema = manifest.require_schema()
+    ingestion_model = manifest.require_ingestion_model()
+
+    assert schema.metadata.name == "public"
+    assert len(schema.graph.vertex_config.vertices) > 0
+    assert len(ingestion_model.resources) > 0
+
+
 def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
     """Test that schema inference works correctly when using pg_catalog fallback methods.
 
@@ -188,7 +207,9 @@ def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
     ):
         # Test that infer_schema_from_postgres works with pg_catalog fallback
         engine = GraphEngine(target_db_flavor=DBType.ARANGO)
-        schema, ingestion_model = engine.infer_schema(conn_conf, schema_name="public")
+        manifest = engine.infer_schema(conn_conf, schema_name="public")
+        schema = manifest.require_schema()
+        ingestion_model = manifest.require_ingestion_model()
 
         # Verify schema structure
         assert schema is not None, "Schema should be inferred"

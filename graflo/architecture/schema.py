@@ -11,8 +11,6 @@ import logging
 import pathlib
 import re
 from collections import Counter
-from typing import Any
-
 import yaml
 from pydantic import (
     Field as PydanticField,
@@ -42,57 +40,6 @@ _SEMVER_RE = re.compile(
     r"(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?"
     r"(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$"
 )
-
-
-def _split_root_config(
-    data: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Split full config into Schema and IngestionModel payloads."""
-    if not isinstance(data, dict):
-        raise TypeError("Configuration payload must be a mapping")
-
-    top_level_keys = set(data.keys())
-    allowed_root_keys = {"metadata", "graph", "db_profile", "ingestion_model"}
-    unknown_root_keys = top_level_keys - allowed_root_keys
-    if unknown_root_keys:
-        unknown_s = ", ".join(sorted(unknown_root_keys))
-        raise ValueError(
-            f"Unknown top-level keys: {unknown_s}. "
-            "Allowed keys: metadata, graph, db_profile, ingestion_model."
-        )
-
-    if "ingestion_model" not in data:
-        raise ValueError(
-            "Missing required 'ingestion_model' section in config payload."
-        )
-
-    if "metadata" not in data:
-        raise ValueError("Missing required 'metadata' section in config payload.")
-    if "graph" not in data:
-        raise ValueError("Missing required 'graph' section in config payload.")
-
-    ingestion_model = data["ingestion_model"]
-    if not isinstance(ingestion_model, dict):
-        raise TypeError("'ingestion_model' must be a mapping")
-    allowed_ingestion_keys = {"resources", "transforms"}
-    unknown_ingestion_keys = set(ingestion_model.keys()) - allowed_ingestion_keys
-    if unknown_ingestion_keys:
-        unknown_s = ", ".join(sorted(unknown_ingestion_keys))
-        raise ValueError(
-            f"Unknown keys under ingestion_model: {unknown_s}. "
-            "Allowed keys: resources, transforms."
-        )
-
-    schema_payload = {
-        "metadata": data["metadata"],
-        "graph": data["graph"],
-        "db_profile": data.get("db_profile", {}),
-    }
-    ingestion_payload = {
-        "resources": ingestion_model.get("resources", []),
-        "transforms": ingestion_model.get("transforms", {}),
-    }
-    return schema_payload, ingestion_payload
 
 
 class GraphMetadata(ConfigBaseModel):
@@ -170,12 +117,6 @@ class IngestionModel(ConfigBaseModel):
     )
 
     _resources: dict[str, Resource] = PrivateAttr()
-
-    @classmethod
-    def from_config(cls, data: dict[str, Any]) -> "IngestionModel":
-        """Load ingestion model from a canonical root config payload."""
-        _, ingestion_payload = _split_root_config(data)
-        return cls.model_validate(ingestion_payload)
 
     @model_validator(mode="after")
     def _init_model(self) -> "IngestionModel":
@@ -278,28 +219,6 @@ class Schema(ConfigBaseModel):
         default_factory=DatabaseProfile,
         description="Database-specific physical profile (secondary indexes, naming, etc.).",
     )
-    _ingestion_model: IngestionModel | None = PrivateAttr(default=None)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_ingestion_keys(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        invalid_keys = {"ingestion_model", "resources", "transforms"} & set(data.keys())
-        if invalid_keys:
-            invalid_s = ", ".join(sorted(invalid_keys))
-            raise ValueError(
-                "Schema payload must contain only metadata/graph/db_profile. "
-                f"Found ingestion key(s): {invalid_s}. "
-                "Load ingestion via IngestionModel.from_config(config)."
-            )
-        return data
-
-    @classmethod
-    def from_config(cls, data: dict[str, Any]) -> "Schema":
-        """Load schema from a canonical root config payload."""
-        schema_payload, _ = _split_root_config(data)
-        return cls.from_dict(schema_payload)
 
     @model_validator(mode="after")
     def _init_schema(self) -> "Schema":
@@ -311,14 +230,6 @@ class Schema(ConfigBaseModel):
 
     def remove_disconnected_vertices(self) -> set[str]:
         return self.graph.remove_disconnected_vertices()
-
-    def bind_ingestion_model(self, ingestion_model: IngestionModel) -> None:
-        ingestion_model.finish_init(self.graph)
-        object.__setattr__(self, "_ingestion_model", ingestion_model)
-
-    @property
-    def ingestion_model(self) -> IngestionModel | None:
-        return self._ingestion_model
 
     def resolve_db_aware(self, db_flavor: DBType | None = None) -> SchemaDBAware:
         """Build DB-aware runtime wrappers without mutating logical schema."""

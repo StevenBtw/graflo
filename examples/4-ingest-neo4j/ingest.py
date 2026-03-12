@@ -1,14 +1,15 @@
 import pathlib
 from suthing import FileHandle
-from graflo import Bindings, IngestionModel, Schema
-from graflo.util.onto import FilePattern
+from graflo import Bindings, GraphManifest
+from graflo.architecture.bindings import FileConnector
 from graflo.db import Neo4jConfig
 from graflo.hq import GraphEngine
 from graflo.hq.caster import IngestionParams
 
-schema_raw = FileHandle.load("schema.yaml")
-schema = Schema.from_config(schema_raw)
-ingestion_model = IngestionModel.from_config(schema_raw)
+manifest = GraphManifest.from_config(FileHandle.load("schema.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Load config from docker/neo4j/.env (recommended)
 # This automatically reads NEO4J_BOLT_PORT, NEO4J_AUTH, etc.
@@ -28,20 +29,20 @@ conn_conf = Neo4jConfig.from_docker_env()
 # Determine DB type from connection config
 db_type = conn_conf.connection_type
 
-# Create Bindings with file patterns
+# Create Bindings with file connectors
 bindings = Bindings()
-bindings.add_file_pattern(
+bindings.add_file_connector(
     "package",
-    FilePattern(
+    FileConnector(
         # regex=r"^package\.meta.*\.json(?:\.gz)?$",
         regex=r"^package\.meta.*\.json$",
         sub_path=pathlib.Path("./data"),
         resource_name="package",
     ),
 )
-bindings.add_file_pattern(
+bindings.add_file_connector(
     "bug",
-    FilePattern(
+    FileConnector(
         regex=r"^bugs.*\.json(?:\.gz)?$",
         sub_path=pathlib.Path("./data"),
         resource_name="bugs",
@@ -59,11 +60,11 @@ bindings.add_file_pattern(
 # Create GraphEngine and define schema + ingest in one operation
 engine = GraphEngine(target_db_flavor=db_type)
 ingestion_params = IngestionParams(clear_data=True)
+manifest = manifest.model_copy(update={"bindings": bindings})
+manifest.finish_init()
 engine.define_and_ingest(
-    schema=schema,
+    manifest=manifest,
     target_db_config=conn_conf,  # Target database config
-    ingestion_model=ingestion_model,
-    bindings=bindings,  # Source data bindings
     ingestion_params=ingestion_params,
     recreate_schema=True,
 )

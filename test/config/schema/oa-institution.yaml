@@ -1,35 +1,36 @@
-metadata:
-    name: openalex
-graph:
-    vertex_config:
-        vertices:
-        -   name: institution
-            fields:
-            -   _key
-            -   display_name
-            -   country
-            -   type
-            -   grid
-            -   wikidata
-            -   mag
-            -   created_date
-            -   updated_date
-            identity:
-            -   _key
-    edge_config:
-        edges: []
-db_profile:
-    vertex_storage_names:
-        institution: institutions
-    vertex_indexes:
-        institution:
-        -   unique: false
-            type: fulltext
-            fields:
-            -   display_name
-        -   unique: false
-            fields:
-            -   type
+schema:
+    metadata:
+        name: openalex
+    graph:
+        vertex_config:
+            vertices:
+            -   name: institution
+                fields:
+                -   _key
+                -   display_name
+                -   country
+                -   type
+                -   grid
+                -   wikidata
+                -   mag
+                -   created_date
+                -   updated_date
+                identity:
+                -   _key
+        edge_config:
+            edges: []
+    db_profile:
+        vertex_storage_names:
+            institution: institutions
+        vertex_indexes:
+            institution:
+            -   unique: false
+                type: fulltext
+                fields:
+                -   display_name
+            -   unique: false
+                fields:
+                -   type
 ingestion_model:
     resources:
     -   resource_name: institutions
@@ -55,3 +56,4 @@ ingestion_model:
             -   id
             output:
             -   _key
+bindings: {}

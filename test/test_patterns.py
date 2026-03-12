@@ -1,44 +1,44 @@
 import pathlib
 import pytest
 
-from graflo.util.onto import Bindings, FilePattern, TablePattern
+from graflo.architecture.bindings import Bindings, FileConnector, TableConnector
 
 
-def test_patterns():
-    # Create Bindings with FilePattern instances
-    patterns = Bindings()
+def test_connectors():
+    # Create Bindings with FileConnector instances
+    bindings = Bindings()
 
-    # Add file patterns directly
-    pattern_a = FilePattern(
+    # Add file connectors directly
+    connector_a = FileConnector(
         regex=".*", sub_path=pathlib.Path("dir_a/dir_b"), resource_name="a"
     )
-    pattern_b = FilePattern(
+    connector_b = FileConnector(
         regex="^asd", sub_path=pathlib.Path("./"), resource_name="b"
     )
 
-    patterns.add_file_pattern("a", pattern_a)
-    patterns.add_file_pattern("b", pattern_b)
+    bindings.add_file_connector("a", connector_a)
+    bindings.add_file_connector("b", connector_b)
 
-    # Test that patterns work correctly (narrow to FilePattern for .sub_path)
-    pattern_a_loaded = patterns.patterns["a"]
-    pattern_b_loaded = patterns.patterns["b"]
-    assert isinstance(pattern_a_loaded, FilePattern)
-    assert isinstance(pattern_b_loaded, FilePattern)
-    assert pattern_a_loaded.sub_path is not None
-    assert isinstance(pattern_a_loaded.sub_path / "a", pathlib.Path)
-    assert pattern_b_loaded.sub_path is not None
-    assert str(pattern_b_loaded.sub_path / "a") == "a"
+    # Test that connectors work correctly (narrow to FileConnector for .sub_path)
+    connector_a_loaded = bindings.connectors["a"]
+    connector_b_loaded = bindings.connectors["b"]
+    assert isinstance(connector_a_loaded, FileConnector)
+    assert isinstance(connector_b_loaded, FileConnector)
+    assert connector_a_loaded.sub_path is not None
+    assert isinstance(connector_a_loaded.sub_path / "a", pathlib.Path)
+    assert connector_b_loaded.sub_path is not None
+    assert str(connector_b_loaded.sub_path / "a") == "a"
 
-    # Test that patterns can be accessed by name
-    assert "a" in patterns.patterns
-    assert "b" in patterns.patterns
-    assert patterns.get_resource_type("a") == "file"
-    assert patterns.get_resource_type("b") == "file"
+    # Test that connectors can be accessed by name
+    assert "a" in bindings.connectors
+    assert "b" in bindings.connectors
+    assert bindings.get_resource_type("a") == "file"
+    assert bindings.get_resource_type("b") == "file"
 
 
-def test_file_pattern_basic():
-    """Test FilePattern basic functionality."""
-    pattern = FilePattern(
+def test_file_connector_basic():
+    """Test FileConnector basic functionality."""
+    pattern = FileConnector(
         regex=r".*\.csv$",
         sub_path=pathlib.Path("./data"),
     )
@@ -47,11 +47,11 @@ def test_file_pattern_basic():
     assert pattern.date_filter is None
 
 
-def test_file_pattern_date_validation():
-    """Test FilePattern date filtering parameter validation."""
+def test_file_connector_date_validation():
+    """Test FileConnector date filtering parameter validation."""
     # Should raise error if date_filter is set without date_field
     with pytest.raises(ValueError, match="date_field is required"):
-        FilePattern(
+        FileConnector(
             regex=r".*\.csv$",
             sub_path=pathlib.Path("./data"),
             date_filter="> '2020-10-10'",
@@ -59,7 +59,7 @@ def test_file_pattern_date_validation():
 
     # Should raise error if date_range_start is set without date_field
     with pytest.raises(ValueError, match="date_field is required"):
-        FilePattern(
+        FileConnector(
             regex=r".*\.csv$",
             sub_path=pathlib.Path("./data"),
             date_range_start="2015-11-11",
@@ -67,7 +67,7 @@ def test_file_pattern_date_validation():
 
     # Should raise error if date_range_days is set without date_range_start
     with pytest.raises(ValueError, match="date_range_start is required"):
-        FilePattern(
+        FileConnector(
             regex=r".*\.csv$",
             sub_path=pathlib.Path("./data"),
             date_field="dt",
@@ -75,7 +75,7 @@ def test_file_pattern_date_validation():
         )
 
     # Should work with all required parameters
-    pattern = FilePattern(
+    pattern = FileConnector(
         regex=r".*\.csv$",
         sub_path=pathlib.Path("./data"),
         date_field="dt",
@@ -85,9 +85,9 @@ def test_file_pattern_date_validation():
     assert pattern.date_filter == "> '2020-10-10'"
 
 
-def test_table_pattern_basic():
-    """Test TablePattern basic functionality."""
-    pattern = TablePattern(
+def test_table_connector_basic():
+    """Test TableConnector basic functionality."""
+    pattern = TableConnector(
         table_name="events",
         schema_name="public",
     )
@@ -95,32 +95,32 @@ def test_table_pattern_basic():
     assert pattern.schema_name == "public"
 
 
-def test_table_pattern_date_validation():
-    """Test TablePattern date filtering parameter validation."""
+def test_table_connector_date_validation():
+    """Test TableConnector date filtering parameter validation."""
     # Should raise error if date_filter is set without date_field
     with pytest.raises(ValueError, match="date_field is required"):
-        TablePattern(
+        TableConnector(
             table_name="events",
             date_filter="> '2020-10-10'",
         )
 
     # Should raise error if date_range_start is set without date_field
     with pytest.raises(ValueError, match="date_field is required"):
-        TablePattern(
+        TableConnector(
             table_name="events",
             date_range_start="2015-11-11",
         )
 
     # Should raise error if date_range_days is set without date_range_start
     with pytest.raises(ValueError, match="date_range_start is required"):
-        TablePattern(
+        TableConnector(
             table_name="events",
             date_field="dt",
             date_range_days=30,
         )
 
     # Should work with all required parameters
-    pattern = TablePattern(
+    pattern = TableConnector(
         table_name="events",
         date_field="dt",
         date_filter="> '2020-10-10'",
@@ -129,16 +129,16 @@ def test_table_pattern_date_validation():
     assert pattern.date_filter == "> '2020-10-10'"
 
 
-def test_table_pattern_build_where_clause_no_filter():
+def test_table_connector_build_where_clause_no_filter():
     """Test build_where_clause with no filters."""
-    pattern = TablePattern(table_name="events")
+    pattern = TableConnector(table_name="events")
     assert pattern.build_where_clause() == ""
 
 
-def test_table_pattern_build_where_clause_date_filter():
+def test_table_connector_build_where_clause_date_filter():
     """Test build_where_clause with date_filter."""
     # Test with quoted date
-    pattern = TablePattern(
+    pattern = TableConnector(
         table_name="events",
         date_field="created_at",
         date_filter="> '2020-10-10'",
@@ -148,7 +148,7 @@ def test_table_pattern_build_where_clause_date_filter():
     assert "> '2020-10-10'" in where_clause
 
     # Test with unquoted date (should add quotes)
-    pattern2 = TablePattern(
+    pattern2 = TableConnector(
         table_name="events",
         date_field="dt",
         date_filter="> 2020-10-10",
@@ -158,7 +158,7 @@ def test_table_pattern_build_where_clause_date_filter():
     assert "> '2020-10-10'" in where_clause2
 
     # Test with >= operator
-    pattern3 = TablePattern(
+    pattern3 = TableConnector(
         table_name="events",
         date_field="dt",
         date_filter=">= '2015-11-11'",
@@ -168,9 +168,9 @@ def test_table_pattern_build_where_clause_date_filter():
     assert ">= '2015-11-11'" in where_clause3
 
 
-def test_table_pattern_build_where_clause_date_range():
+def test_table_connector_build_where_clause_date_range():
     """Test build_where_clause with date_range_start and date_range_days."""
-    pattern = TablePattern(
+    pattern = TableConnector(
         table_name="transactions",
         date_field="dt",
         date_range_start="2015-11-11",
@@ -188,65 +188,65 @@ def test_table_pattern_build_where_clause_date_range():
     assert where_clause.count("<") == 1
 
 
-def test_table_pattern_build_where_clause_complex():
+def test_table_connector_build_where_clause_complex():
     """Test build_where_clause with various date filter formats."""
     # Test with different operators
-    pattern1 = TablePattern(
+    connector = TableConnector(
         table_name="events",
         date_field="timestamp",
         date_filter="< '2023-01-01'",
     )
-    where1 = pattern1.build_where_clause()
+    where1 = connector.build_where_clause()
     assert '"timestamp"' in where1
     assert "< '2023-01-01'" in where1
 
     # Test with != operator
-    pattern2 = TablePattern(
+    connector2 = TableConnector(
         table_name="events",
         date_field="dt",
         date_filter="!= '2020-01-01'",
     )
-    where2 = pattern2.build_where_clause()
+    where2 = connector2.build_where_clause()
     assert '"dt"' in where2
     assert "!= '2020-01-01'" in where2
 
 
-def test_patterns_with_filtering():
+def test_connectors_with_filtering():
     """Test Bindings collection with filtering parameters."""
-    patterns = Bindings()
+    bindings = Bindings()
 
     # Add file pattern
-    file_pattern = FilePattern(
+    file_connector = FileConnector(
         regex=r".*\.csv$",
         sub_path=pathlib.Path("./data"),
         resource_name="users",
     )
-    patterns.add_file_pattern("users", file_pattern)
+    bindings.add_file_connector("users", file_connector)
 
     # Add table pattern with date filter
-    table_pattern = TablePattern(
+    table_connector = TableConnector(
         table_name="events",
         schema_name="public",
         date_field="created_at",
         date_filter="> '2020-10-10'",
         resource_name="events",
     )
-    patterns.add_table_pattern("events", table_pattern)
+    bindings.add_table_connector("events", table_connector)
 
-    # Verify patterns are stored correctly (narrow with isinstance checks)
-    users_pattern = patterns.patterns["users"]
-    events_pattern = patterns.patterns["events"]
-    assert isinstance(users_pattern, FilePattern)
+    # Verify connectors are stored correctly (narrow with isinstance checks)
+    users_pattern = bindings.connectors["users"]
+    events_pattern = bindings.connectors["events"]
+    assert isinstance(users_pattern, FileConnector)
     assert users_pattern.regex == r".*\.csv$"
-    assert isinstance(events_pattern, TablePattern)
+    assert isinstance(events_pattern, TableConnector)
     assert events_pattern.date_field == "created_at"
     assert events_pattern.date_filter == "> '2020-10-10'"
 
 
-def test_table_pattern_sql_query_building():
-    """Test that TablePattern builds correct SQL queries with filters."""
+def test_table_connector_sql_query_building():
+    """Test that TableConnector builds correct SQL queries with filters."""
     # Test the query building logic directly (as used in caster.py)
-    table_pattern = TablePattern(
+    table_connector = TableConnector(
         table_name="events",
         schema_name="public",
         date_field="dt",
@@ -255,7 +255,7 @@ def test_table_pattern_sql_query_building():
     )
 
     # Test WHERE clause building
-    where_clause = table_pattern.build_where_clause()
+    where_clause = table_connector.build_where_clause()
     expected_where = "\"dt\" > '2020-10-10'"
     assert where_clause == expected_where
 
@@ -271,7 +271,7 @@ def test_table_pattern_sql_query_building():
     assert '"dt"' in full_query
 
     # Test with no date filter
-    pattern_no_date = TablePattern(
+    pattern_no_date = TableConnector(
         table_name="users",
         schema_name="public",
     )
@@ -282,9 +282,9 @@ def test_table_pattern_sql_query_building():
     assert "WHERE" not in query_no_date
 
 
-def test_table_pattern_date_range_sql():
+def test_table_connector_date_range_sql():
     """Test SQL query building with date range."""
-    pattern = TablePattern(
+    pattern = TableConnector(
         table_name="transactions",
         date_field="dt",
         date_range_start="2015-11-11",

@@ -24,8 +24,18 @@ from .database_features import DatabaseProfile, EdgeIndexSpec
 from .db_aware import EdgeConfigDBAware, SchemaDBAware, VertexConfigDBAware
 from .edge import Edge, EdgeConfig
 from .executor import ActorExecutor
+from .bindings import (
+    Bindings,
+    FileConnector,
+    JoinClause,
+    ResourceConnector,
+    ResourceType,
+    SparqlConnector,
+    TableConnector,
+)
 from .onto import Index
 from .resource import Resource
+from .manifest import GraphManifest
 from .schema import GraphMetadata, GraphModel, IngestionModel, Schema
 from .vertex import FieldType, Vertex, VertexConfig
 
@@ -40,7 +50,15 @@ __all__ = [
     "GraphMetadata",
     "DatabaseProfile",
     "GraphModel",
+    "GraphManifest",
     "IngestionModel",
+    "Bindings",
+    "ResourceConnector",
+    "ResourceType",
+    "FileConnector",
+    "JoinClause",
+    "TableConnector",
+    "SparqlConnector",
     "Resource",
     "Schema",
     "SchemaDBAware",

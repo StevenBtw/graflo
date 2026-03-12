@@ -11,8 +11,8 @@ import pandas as pd
 import pytest
 from suthing import FileHandle
 
+from graflo.architecture.manifest import GraphManifest
 from graflo.architecture.onto import GraphContainer
-from graflo.architecture.schema import IngestionModel, Schema
 
 
 def _load_csv_as_dicts(csv_path: Path) -> list[dict]:
@@ -24,11 +24,11 @@ def _load_csv_as_dicts(csv_path: Path) -> list[dict]:
 @pytest.fixture
 def schema_objects_relations():
     """Schema with vertex_router (objects) and edge_router (relations) resources."""
-    schema_dict = FileHandle.load("test.config.schema", "objects-relations.yaml")
-    schema = Schema.from_config(schema_dict)
-    ingestion_model = IngestionModel.from_config(schema_dict)
-    schema.bind_ingestion_model(ingestion_model)
-    return schema
+    manifest = GraphManifest.from_config(
+        FileHandle.load("test.config.schema", "objects-relations.yaml")
+    )
+    manifest.finish_init()
+    return manifest
 
 
 @pytest.fixture
@@ -52,8 +52,7 @@ class TestObjectsResource:
         self, schema_objects_relations, objects_data
     ):
         """Each objects row is routed to the correct vertex type via type_map."""
-        ingestion_model = schema_objects_relations.ingestion_model
-        assert ingestion_model is not None
+        ingestion_model = schema_objects_relations.require_ingestion_model()
         resource = ingestion_model.fetch_resource("objects")
         all_docs = [resource(doc) for doc in objects_data]
         graph = GraphContainer.from_docs_list(all_docs)
@@ -70,8 +69,7 @@ class TestObjectsResource:
         self, schema_objects_relations, objects_data
     ):
         """Routed vertices retain expected fields from the source row."""
-        ingestion_model = schema_objects_relations.ingestion_model
-        assert ingestion_model is not None
+        ingestion_model = schema_objects_relations.require_ingestion_model()
         resource = ingestion_model.fetch_resource("objects")
         # First row is Person (Alice Martin)
         doc = objects_data[0]
@@ -95,8 +93,7 @@ class TestRelationsResource:
         self, schema_objects_relations, relations_data
     ):
         """Each relations row produces one edge with canonical relation names."""
-        ingestion_model = schema_objects_relations.ingestion_model
-        assert ingestion_model is not None
+        ingestion_model = schema_objects_relations.require_ingestion_model()
         resource = ingestion_model.fetch_resource("relations")
         all_docs = [resource(doc) for doc in relations_data]
         graph = GraphContainer.from_docs_list(all_docs)
@@ -110,8 +107,7 @@ class TestRelationsResource:
         self, schema_objects_relations, relations_data
     ):
         """relation_map translates EMPLOYED_BY -> employed_by etc."""
-        ingestion_model = schema_objects_relations.ingestion_model
-        assert ingestion_model is not None
+        ingestion_model = schema_objects_relations.require_ingestion_model()
         resource = ingestion_model.fetch_resource("relations")
         all_docs = [resource(doc) for doc in relations_data]
         graph = GraphContainer.from_docs_list(all_docs)
@@ -129,8 +125,7 @@ class TestObjectsAndRelationsCombined:
         self, schema_objects_relations, objects_data, relations_data
     ):
         """Processing both resources yields correct vertex and edge counts."""
-        ingestion_model = schema_objects_relations.ingestion_model
-        assert ingestion_model is not None
+        ingestion_model = schema_objects_relations.require_ingestion_model()
         objects_resource = ingestion_model.fetch_resource("objects")
         relations_resource = ingestion_model.fetch_resource("relations")
 

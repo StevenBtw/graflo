@@ -135,7 +135,7 @@ database_features:
         - fields: [relation]
 ```
 
-Resources define **how** each data stream is turned into vertices and edges. Each resource has a unique **`resource_name`** (used by Patterns / DataSourceRegistry to bind files, APIs, or SQL to this pipeline) and an **`apply`** (or **`pipeline`**) list of **actor steps**. Steps are executed in order; the pipeline can branch with **descend** steps.
+Resources define **how** each data stream is turned into vertices and edges. Each resource has a unique **`resource_name`** (used by `Bindings` / `DataSourceRegistry` to bind files, APIs, or SQL to this pipeline) and an **`apply`** (or **`pipeline`**) list of **actor steps**. Steps are executed in order; the pipeline can branch with **descend** steps.
 
 ### Resource-level fields
 
@@ -307,39 +307,55 @@ improves debuggability of actor pipelines.
 
 ## Loading a schema
 
-All schema configs are Pydantic models. Load both schema and ingestion model from the canonical root config:
+All schema configs are Pydantic models. Load once through `GraphManifest`:
 
 ```python
-from graflo import IngestionModel, Schema
+from graflo import GraphManifest
 from suthing import FileHandle
 
-schema_raw = FileHandle.load("schema.yaml")
-schema = Schema.from_config(schema_raw)
-ingestion_model = IngestionModel.from_config(schema_raw)
-schema.bind_ingestion_model(ingestion_model)
+manifest = GraphManifest.from_config(FileHandle.load("schema.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 ```
 
-After binding, ingestion resources are initialized against the graph model. Access resources via `schema.ingestion_model.fetch_resource(...)`.
+Resources are initialized against the schema graph during `manifest.finish_init()`. Access resources via `ingestion_model.fetch_resource(...)`.
+
+```mermaid
+classDiagram
+  class GraphManifest {
+    +Schema schema
+    +IngestionModel ingestion_model
+    +Bindings bindings
+    +finish_init()
+  }
+  class Schema
+  class IngestionModel
+  class Bindings
+  GraphManifest --> Schema
+  GraphManifest --> IngestionModel
+  GraphManifest --> Bindings
+```
 
 ## Minimal full example
 
 ```yaml
-metadata:
-  name: hr
-
-graph:
-  vertex_config:
-    vertices:
-      - name: person
-        fields: [id, name, age]
-        identity: [id]
-      - name: department
-        fields: [name]
-        identity: [name]
-  edge_config:
-    edges:
-      - source: person
-        target: department
+schema:
+  metadata:
+    name: hr
+  graph:
+    vertex_config:
+      vertices:
+        - name: person
+          fields: [id, name, age]
+          identity: [id]
+        - name: department
+          fields: [name]
+          identity: [name]
+    edge_config:
+      edges:
+        - source: person
+          target: department
 ingestion_model:
   resources:
     - resource_name: people
@@ -351,15 +367,16 @@ ingestion_model:
           "from": {id: person_id, name: person}
         - vertex: department
           "from": {name: department}
+bindings: {}
 ```
 
-This defines two vertex types (`person`, `department`), one edge type (`person` → `department`), and two resources: **people** (each row → one `person` vertex) and **departments** (transform + `department` vertices). Data sources are attached to these resources by name (e.g. via `Patterns` or `DataSourceRegistry`) as shown in the [Quick Start](quickstart.md).
+This defines two vertex types (`person`, `department`), one edge type (`person` → `department`), and two resources: **people** (each row → one `person` vertex) and **departments** (transform + `department` vertices). Data sources are attached to these resources by name (e.g. via `Bindings` or `DataSourceRegistry`) as shown in the [Quick Start](quickstart.md).
 
-## Patterns and data source binding
+## Bindings and data source binding
 
-Schema defines *what* to extract; **Patterns** define *where* data comes from. For SQL tables, use `TablePattern` with optional `view: SelectSpec` for advanced control over the query:
+Schema defines *what* to extract; **Bindings** define *where* data comes from. For SQL tables, use `TableConnector` with optional `view: SelectSpec` for advanced control over the query:
 
-- **Default**: `TablePattern` with `table_name`, `joins`, `filters` builds a standard `SELECT` query.
+- **Default**: `TableConnector` with `table_name`, `joins`, `filters` builds a standard `SELECT` query.
 - **SelectSpec view**: Use `view: SelectSpec` for full control — either `kind="select"` (custom `from`, `joins`, `select`, `where`) or `kind="type_lookup"` (shorthand for edge tables where source/target types come from a lookup table via FK joins).
 
 See [filter.view](../reference/filter/view.md) for SelectSpec details.

@@ -4,7 +4,7 @@ GraFlo is a Graph Schema & Transformation Language (GSTL) for Labeled Property G
 
 ## System Overview
 
-The GraFlo pipeline transforms data through five stages:
+The GraFlo pipeline transforms data through six stages with a manifest contract boundary:
 
 ```mermaid
 %%{ init: { 
@@ -20,23 +20,33 @@ The GraFlo pipeline transforms data through five stages:
 } }%%
 
 flowchart LR
+    MF["<b>GraphManifest</b><br/>schema + ingestion_model + bindings"]
     SI["<b>Source Instance</b><br/>File · SQL · SPARQL · API"]
     R["<b>Resource</b><br/>Actor Pipeline"]
     EX["<b>Extraction</b><br/>Observations + Edge Intents"]
     AS["<b>Assembly</b><br/>Graph Entity Materialization"]
-    GS["<b>Graph Schema</b><br/>Vertex/Edge Definitions<br/>Identities · Transforms · DB Features"]
+    GS["<b>Schema (logical)</b><br/>Vertex/Edge Definitions<br/>Identities · DB Profile"]
+    IM["<b>IngestionModel</b><br/>Resources · Transforms"]
+    BD["<b>Bindings</b><br/>Resource -> Data Source mapping"]
     GC["<b>GraphContainer</b><br/>Covariant Graph Representation"]
     DB["<b>Graph DB (LPG)</b><br/>ArangoDB · Neo4j · TigerGraph · Others"]
 
+    MF --> GS
+    MF --> IM
+    MF --> BD
     SI --> R --> EX --> AS --> GC --> DB
-    GS -. configures .-> R
+    IM -. configures .-> R
     GS -. constrains .-> AS
+    BD -. routes sources .-> R
 ```
 
 
 - **Source Instance** — a concrete data artifact (a file, a table, a SPARQL endpoint), wrapped by an `AbstractDataSource` with a `DataSourceType` (`FILE`, `SQL`, `SPARQL`, `API`, `IN_MEMORY`).
 - **Resource** — a reusable transformation pipeline (actor steps: descend, transform, vertex, edge) that maps raw records to graph elements. Data sources bind to Resources by name via the `DataSourceRegistry`.
-- **Graph Schema** — the declarative specification (`Schema`): vertex/edge definitions, logical identities, typed fields, DB features, transforms, and the Resources themselves.
+- **GraphManifest** — the canonical top-level contract that composes `schema`, `ingestion_model`, and `bindings`.
+- **Schema** — the declarative logical graph model (`Schema`): vertex/edge definitions, identities, typed fields, and DB profile.
+- **IngestionModel** — reusable resources and transforms used to map records into graph entities.
+- **Bindings** — resource-to-source mapping (`FileConnector`, `TableConnector`, `SparqlConnector`).
 - **Covariant Graph Representation** — a `GraphContainer` of vertices and edges, independent of any target database.
 - **Graph DB** — the target LPG store (ArangoDB, Neo4j, TigerGraph, FalkorDB, Memgraph, NebulaGraph).
 
@@ -53,10 +63,10 @@ flowchart LR
         Files["CSV / JSON files"]
         PG["PostgreSQL"]
     end
-    subgraph patterns [Patterns]
-        FP[FilePattern]
-        TP[TablePattern]
-        SP[SparqlPattern]
+    subgraph patterns [Bindings]
+        FP[FileConnector]
+        TP[TableConnector]
+        SP[SparqlConnector]
     end
     subgraph datasources [DataSource Layer]
         subgraph rdfFamily ["RdfDataSource (abstract)"]
@@ -84,7 +94,7 @@ flowchart LR
     Res --> Ex --> Asm --> GC --> DBW
 ```
 
-- **Patterns** (`FilePattern`, `TablePattern`, `SparqlPattern`) describe *where* data comes from (file paths, SQL tables, SPARQL endpoints).
+- **Bindings** (`FileConnector`, `TableConnector`, `SparqlConnector`) describe *where* data comes from (file paths, SQL tables, SPARQL endpoints).
 - **DataSources** (`AbstractDataSource` subclasses) handle *how* to read data in batches. Each carries a `DataSourceType` and is registered in the `DataSourceRegistry`.
 - **Resources** define *what* to extract — each `Resource` is a reusable actor pipeline (descend → transform → vertex → edge) that maps raw records to graph elements.
 - **GraphContainer** (covariant graph representation) collects the resulting vertices and edges in a database-independent format.
@@ -95,7 +105,7 @@ flowchart LR
 ### GraphEngine orchestration
 
 `GraphEngine` is the top-level orchestrator that coordinates schema inference,
-pattern creation, schema definition, and data ingestion. The diagram below shows
+connector creation, schema definition, and data ingestion. The diagram below shows
 how it delegates to specialised components.
 
 ```mermaid
@@ -106,30 +116,31 @@ classDiagram
         +target_db_flavor: DBType
         +resource_mapper: ResourceMapper
         +introspect(postgres_config) SchemaIntrospectionResult
-        +infer_schema(postgres_config) Schema
-        +create_patterns(postgres_config) Patterns
-        +infer_schema_from_rdf(source) Schema
-        +create_patterns_from_rdf(source) Patterns
-        +define_schema(schema, target_db_config)
-        +define_and_ingest(schema, target_db_config, ...)
-        +ingest(schema, target_db_config, ...)
+        +infer_schema(postgres_config) GraphManifest
+        +create_bindings(postgres_config, ...) Bindings
+        +infer_schema_from_rdf(source) tuple~Schema, IngestionModel~
+        +create_bindings_from_rdf(source) Bindings
+        +define_schema(manifest, target_db_config)
+        +define_and_ingest(manifest, target_db_config, ...)
+        +ingest(manifest, target_db_config, ...)
     }
 
     class InferenceManager {
         +conn: PostgresConnection
         +target_db_flavor: DBType
         +introspect(schema_name) SchemaIntrospectionResult
-        +infer_complete_schema(schema_name) Schema
+        +infer_complete_schema(schema_name) tuple~Schema, IngestionModel~
     }
 
     class ResourceMapper {
-        +create_patterns_from_postgres(conn, ...) Patterns
+        +create_bindings_from_postgres(conn, ...) Bindings
     }
 
     class Caster {
         +schema: Schema
+        +ingestion_model: IngestionModel
         +ingestion_params: IngestionParams
-        +ingest(target_db_config, patterns, ...)
+        +ingest(target_db_config, bindings, ...)
     }
 
     class ConnectionManager {
@@ -142,10 +153,17 @@ classDiagram
         «see Schema diagram»
     }
 
-    class Patterns {
-        +file_patterns: list~FilePattern~
-        +table_patterns: list~TablePattern~
-        +sparql_patterns: list~SparqlPattern~
+    class GraphManifest {
+        +graph_schema: Schema?
+        +ingestion_model: IngestionModel?
+        +bindings: Bindings?
+        +finish_init()
+    }
+
+    class Bindings {
+        +file_connectors: list~FileConnector~
+        +table_connectors: list~TableConnector~
+        +sparql_connectors: list~SparqlConnector~
     }
 
     class DBConfig {
@@ -159,34 +177,44 @@ classDiagram
     GraphEngine --> ResourceMapper : resource_mapper
     GraphEngine --> Caster : creates for ingest
     GraphEngine --> ConnectionManager : creates for define_schema
-    GraphEngine ..> Schema : produces / consumes
-    GraphEngine ..> Patterns : produces / consumes
+    GraphEngine ..> GraphManifest : produces / consumes
+    GraphEngine ..> Bindings : produces / consumes
     GraphEngine ..> DBConfig : target_db_config
 ```
 
 ### Schema architecture
 
-`Schema` is the central configuration object that defines how data is
-transformed into a property graph. The diagram below shows its constituent
-parts and their relationships.
+`Schema` and `IngestionModel` split logical graph structure from ingestion
+runtime pipelines. The diagram below shows their constituent parts and
+relationships.
 
 ```mermaid
 classDiagram
     direction TB
 
     class Schema {
-        +general: SchemaMetadata
-        +vertex_config: VertexConfig
-        +edge_config: EdgeConfig
-        +database_features: DatabaseFeatures
-        +resources: list~Resource~
-        +transforms: dict~str,ProtoTransform~
+        +metadata: GraphMetadata
+        +graph: GraphModel
+        +db_profile: DatabaseProfile
         +finish_init()
-        +fetch_resource(name) Resource
         +remove_disconnected_vertices()
+        +resolve_db_aware(db_flavor?) SchemaDBAware
     }
 
-    class SchemaMetadata {
+    class GraphModel {
+        +vertex_config: VertexConfig
+        +edge_config: EdgeConfig
+        +finish_init()
+    }
+
+    class IngestionModel {
+        +resources: list~Resource~
+        +transforms: dict~str,ProtoTransform~
+        +finish_init(graph)
+        +fetch_resource(name) Resource
+    }
+
+    class GraphMetadata {
         +name: str
         +version: str?
         +description: str?
@@ -279,11 +307,12 @@ classDiagram
         +from_dict(data) FilterExpression
     }
 
-    Schema *-- SchemaMetadata : general
-    Schema *-- VertexConfig : vertex_config
-    Schema *-- EdgeConfig : edge_config
-    Schema *-- "0..*" Resource : resources
-    Schema *-- "0..*" ProtoTransform : transforms
+    Schema *-- GraphMetadata : metadata
+    Schema *-- GraphModel : graph
+    GraphModel *-- VertexConfig : vertex_config
+    GraphModel *-- EdgeConfig : edge_config
+    IngestionModel *-- "0..*" Resource : resources
+    IngestionModel *-- "0..*" ProtoTransform : transforms
 
     VertexConfig *-- "0..*" Vertex : vertices
     Vertex *-- "0..*" Field : fields
@@ -331,12 +360,12 @@ flowchart TD
   schema[LogicalSchema]
   vcfg[VertexConfigLogical]
   ecfg[EdgeConfigLogical]
-  dbfeat[DatabaseFeatures]
+  dbfeat[DatabaseProfile]
   resolver[DbAwareConfigResolver]
   vdb[VertexConfigDBAware]
   edb[EdgeConfigDBAware]
   caster[CasterAndResources]
-  dbwriter[DBWriterAndConnectors]
+  dbwriter[DBWriterAndBindings]
 
   schema --> vcfg
   schema --> ecfg
@@ -362,8 +391,9 @@ classDiagram
 
     class Caster {
         +schema: Schema
+        +ingestion_model: IngestionModel
         +ingestion_params: IngestionParams
-        +ingest(target_db_config, patterns, ...)
+        +ingest(target_db_config, bindings, ...)
         +cast_normal_resource(data, resource_name) GraphContainer
         +process_batch(batch, resource_name, conn_conf)
         +process_data_source(data_source, ...)
@@ -440,10 +470,16 @@ These are the two key abstractions that decouple *data retrieval* from *graph tr
 The `Schema` is the single source of truth for the LPG structure. It encapsulates:
  
 - Vertex and edge definitions with optional type information
-- Resource mappings
-- Data transformations
 - Identity and physical index configurations
+- DB profile defaults and DB-aware projection settings
 - Automatic schema inference from normalized PostgreSQL databases (3NF with PK/FK) or from OWL/RDFS ontologies
+
+### IngestionModel
+The `IngestionModel` is the source of truth for ingestion runtime behavior. It encapsulates:
+
+- Resource mappings and actor pipelines
+- Reusable named transforms
+- Runtime initialization against the logical graph (`finish_init(schema.graph)`)
 
 ### Vertex
 A `Vertex` describes vertices and their logical identity. It supports:
@@ -705,7 +741,7 @@ resources:
 - **Vertex Filtering** — filter vertices based on custom conditions.
 - **PostgreSQL Schema Inference** — infer schemas from normalised PostgreSQL databases (3NF) with PK/FK constraints.
 - **RDF / OWL Schema Inference** — infer schemas from OWL/RDFS ontologies: `owl:Class` → vertices, `owl:ObjectProperty` → edges, `owl:DatatypeProperty` → vertex fields.
-- **SelectSpec** — declarative view specification for advanced filtering and projection of SQL data before feeding into Resources. Use `TablePattern.view` with `SelectSpec` (full SQL-like `select` or `type_lookup` shorthand for edge tables with FK-based type resolution) to control exactly what data is queried.
+- **SelectSpec** — declarative view specification for advanced filtering and projection of SQL data before feeding into Resources. Use `TableConnector.view` with `SelectSpec` (full SQL-like `select` or `type_lookup` shorthand for edge tables with FK-based type resolution) to control exactly what data is queried.
 
 ### Schema Migration (v1)
 - **Read-only planning first** — use `migrate_schema plan --from-schema-path ... --to-schema-path ...` to generate a deterministic operation plan before any writes.

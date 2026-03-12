@@ -9,22 +9,31 @@ from typing import Any
 
 from suthing import FileHandle
 
+from graflo.architecture.manifest import GraphManifest
 from graflo.architecture.schema import IngestionModel, Schema
 
 
+def load_manifest(path: str | Path) -> GraphManifest:
+    """Load and initialize graph manifest from YAML path."""
+    manifest = GraphManifest.from_config(FileHandle.load(path))
+    manifest.finish_init()
+    return manifest
+
+
 def load_schema(path: str | Path) -> Schema:
-    """Load and initialize schema from YAML path."""
-    schema_raw = FileHandle.load(path)
-    schema = Schema.from_config(schema_raw)
-    return schema
+    """Load schema block from a manifest path."""
+    return load_manifest(path).require_schema()
 
 
-def load_ingestion_model(path: str | Path, schema: Schema) -> IngestionModel:
-    """Load and initialize ingestion model from YAML path."""
-    schema_raw = FileHandle.load(path)
-    ingestion = IngestionModel.from_config(schema_raw)
-    schema.bind_ingestion_model(ingestion)
-    return ingestion
+def load_ingestion_model(
+    path: str | Path, schema: Schema | None = None
+) -> IngestionModel:
+    """Load ingestion block from a manifest path."""
+    manifest = load_manifest(path)
+    ingestion_model = manifest.require_ingestion_model()
+    if schema is not None:
+        ingestion_model.finish_init(schema.graph)
+    return ingestion_model
 
 
 def _stable_hash(payload_obj: Any) -> str:
@@ -57,6 +66,24 @@ def full_hash(schema: Schema, ingestion_model: IngestionModel, bindings: Any) ->
         "schema": schema.to_dict(),
         "ingestion": ingestion_model.to_dict(),
         "bindings": bindings.to_dict() if hasattr(bindings, "to_dict") else bindings,
+    }
+    return _stable_hash(payload)
+
+
+def manifest_hash(manifest: GraphManifest) -> str:
+    """Stable hash over manifest blocks."""
+    payload = {
+        "schema": manifest.graph_schema.to_dict()
+        if manifest.graph_schema is not None
+        else None,
+        "ingestion_model": (
+            manifest.ingestion_model.to_dict()
+            if manifest.ingestion_model is not None
+            else None
+        ),
+        "bindings": manifest.bindings.to_dict()
+        if manifest.bindings is not None
+        else None,
     }
     return _stable_hash(payload)
 

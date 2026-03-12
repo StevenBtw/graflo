@@ -21,40 +21,33 @@ import logging
 import pytest
 
 from graflo.onto import DBType
-from test.conftest import fetch_schema_obj
+from test.conftest import fetch_manifest_obj
 from graflo.hq.sanitizer import SchemaSanitizer
+from graflo.architecture.manifest import GraphManifest
 
 
 logger = logging.getLogger(__name__)
 
 
-def _require_ingestion_model(schema):
-    ingestion_model = schema.ingestion_model
-    assert ingestion_model is not None
-    return ingestion_model
-
-
 @pytest.fixture
 def schema_with_reserved_words():
-    schema_o = fetch_schema_obj("tigergraph-sanitize")
-    return schema_o
+    return fetch_manifest_obj("tigergraph-sanitize")
 
 
 @pytest.fixture
 def schema_with_incompatible_edges():
-    schema_o = fetch_schema_obj("tigergraph-sanitize-edges")
-    return schema_o
+    return fetch_manifest_obj("tigergraph-sanitize-edges")
 
 
 def test_vertex_name_sanitization_for_tigergraph(schema_with_reserved_words):
     """Test that vertex names with reserved words are sanitized for TigerGraph."""
-    schema = schema_with_reserved_words
+    manifest: GraphManifest = schema_with_reserved_words
+    schema = manifest.require_schema()
+    ingestion_model = manifest.require_ingestion_model()
 
     sanitizer = SchemaSanitizer(DBType.TIGERGRAPH)
 
-    sanitized_schema = sanitizer.sanitize(
-        schema, ingestion_model=_require_ingestion_model(schema)
-    )
+    sanitized_schema = sanitizer.sanitize(schema, ingestion_model=ingestion_model)
 
     vertex_dbnames = [
         sanitized_schema.db_profile.vertex_storage_name(v.name)
@@ -70,13 +63,13 @@ def test_vertex_name_sanitization_for_tigergraph(schema_with_reserved_words):
 
 def test_edges_sanitization_for_tigergraph(schema_with_incompatible_edges):
     """Test that vertex names with reserved words are sanitized for TigerGraph."""
-    schema = schema_with_incompatible_edges
+    manifest: GraphManifest = schema_with_incompatible_edges
+    schema = manifest.require_schema()
+    ingestion_model = manifest.require_ingestion_model()
 
     sanitizer = SchemaSanitizer(DBType.TIGERGRAPH)
 
-    sanitized_schema = sanitizer.sanitize(
-        schema, ingestion_model=_require_ingestion_model(schema)
-    )
+    sanitized_schema = sanitizer.sanitize(schema, ingestion_model=ingestion_model)
 
     # sanitized_schema.to_yaml_file(
     #     os.path.join(
@@ -85,9 +78,9 @@ def test_edges_sanitization_for_tigergraph(schema_with_incompatible_edges):
     #     )
     # )
 
-    assert _require_ingestion_model(sanitized_schema).resources[
-        -1
-    ].root.actor.descendants[0].actor.t.map == {"container_name": "id"}
+    assert ingestion_model.resources[-1].root.actor.descendants[0].actor.t.map == {
+        "container_name": "id"
+    }
 
     assert sanitized_schema.graph.vertex_config.vertices[-1].fields[0].name == "id"
     assert sanitized_schema.graph.vertex_config.vertices[-1].identity[0] == "id"

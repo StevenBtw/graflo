@@ -25,7 +25,7 @@ from pathlib import Path
 import networkx as nx
 from suthing import FileHandle
 
-from graflo.architecture import IngestionModel, Schema
+from graflo.architecture import GraphManifest
 from graflo.architecture.actor import (
     ActorWrapper,
     DescendActor,
@@ -270,10 +270,10 @@ class SchemaPlotter:
         self.fig_path = fig_path
 
         self.config = FileHandle.load(fpath=config_filename)
-
-        self.schema = Schema.from_config(self.config)
-        self.ingestion_model = IngestionModel.from_config(self.config)
-        self.schema.bind_ingestion_model(self.ingestion_model)
+        manifest = GraphManifest.from_config(self.config)
+        manifest.finish_init()
+        self.schema = manifest.require_schema()
+        self.ingestion_model = manifest.require_ingestion_model()
 
         self.name = self.schema.metadata.name
         self.prefix = self.name

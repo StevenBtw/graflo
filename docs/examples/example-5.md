@@ -64,7 +64,7 @@ The example uses a PostgreSQL database with a typical 3NF (Third Normal Form) sc
 
 ## Automatic Schema Inference
 
-The `GraphEngine.infer_schema_from_postgres()` method automatically analyzes your PostgreSQL database and creates a complete graflo Schema. This process involves several sophisticated steps:
+The `GraphEngine.infer_schema()` method automatically analyzes your PostgreSQL database and creates a complete `GraphManifest` (with `schema` + `ingestion_model`). This process involves several sophisticated steps:
 
 ### How Schema Inference Works
 
@@ -249,7 +249,7 @@ Make sure the corresponding database container is running before starting ingest
 
 Automatically generate a graflo Schema from your PostgreSQL database. This is the core of the automatic inference process:
 
-**What `GraphEngine.infer_schema_from_postgres()` does:**
+**What `GraphEngine.infer_schema()` does:**
 
 1. **Queries PostgreSQL Information Schema**: The function queries PostgreSQL's information schema to discover all tables in the specified schema. It retrieves column information (names, types, constraints), identifies primary keys and foreign keys, and understands table relationships.
 
@@ -278,10 +278,12 @@ db_type = target_config.connection_type
 # Connection is automatically managed inside infer_schema()
 postgres_conf = PostgresConfig.from_docker_env()
 engine = GraphEngine(target_db_flavor=db_type)
-schema = engine.infer_schema(
+manifest = engine.infer_schema(
     postgres_conf,
     schema_name="public",  # PostgreSQL schema name
 )
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 ```
 
 The inferred schema will have:
@@ -291,7 +293,7 @@ The inferred schema will have:
 
   - `users → products` (from `purchases` table) with weight properties
   - `users → users` (from `follows` table) with weight properties
-- **Resources**: Automatically created for each table with appropriate actors
+- **Resources**: Automatically created in `ingestion_model` for each table with appropriate actors
 
 **What happens during inference:**
 
@@ -319,9 +321,9 @@ with open(schema_output_file, "w") as f:
 logger.info(f"Inferred schema saved to {schema_output_file}")
 ```
 
-### Step 5: Create Patterns from PostgreSQL Tables
+### Step 5: Create Bindings from PostgreSQL Tables
 
-Create `Patterns` that map PostgreSQL tables to resources:
+Create `Bindings` that map PostgreSQL tables to resources:
 
 ```python
 
@@ -330,8 +332,8 @@ from graflo.hq import GraphEngine
 # Create GraphEngine instance
 engine = GraphEngine()
 
-# Create patterns from PostgreSQL tables
-patterns = engine.create_patterns(
+# Create bindings from PostgreSQL tables
+bindings = engine.create_bindings(
     postgres_conf,
     schema_name="public"
 )
@@ -349,23 +351,23 @@ datetime_columns = {
     "products": "created_at",
     "follows": "created_at",
 }
-patterns = engine.create_patterns(
+bindings = engine.create_bindings(
     postgres_conf,
     schema_name="public",
     datetime_columns=datetime_columns,
 )
 ```
 
-This creates `TablePattern` instances for each table, which:
+This creates `TableConnector` instances for each table, which:
 
 - Map table names to resource names (e.g., `users` table → `users` resource)
 - Store PostgreSQL connection configuration
 - Enable the Caster to query data directly from PostgreSQL using SQL
 - Optionally store a `date_field` for date-range filtering when `datetime_columns` is provided
 
-**How Patterns Work:**
+**How Bindings Work:**
 
-- Each `TablePattern` contains the PostgreSQL connection info and table name
+- Each `TableConnector` contains the PostgreSQL connection info and table name
 - During ingestion, the Caster queries each table using SQL `SELECT * FROM table_name`
 - Data is streamed directly from PostgreSQL without intermediate files
 - This enables efficient processing of large tables
@@ -390,7 +392,7 @@ Finally, ingest the data from PostgreSQL into your target graph database. This i
 
 You can limit which rows are ingested by providing a date range in `IngestionParams`. Use `datetime_after` and `datetime_before` (ISO-format strings); only rows whose datetime column value falls in `[datetime_after, datetime_before)` are included. This requires either:
 
-- Passing `datetime_columns` when creating patterns (see Step 5), or  
+- Passing `datetime_columns` when creating bindings (see Step 5), or  
 - Setting `datetime_column` in `IngestionParams` as a single default column for all resources.
 
 Example:
@@ -403,17 +405,16 @@ from graflo.hq.caster import IngestionParams
 engine = GraphEngine()
 ingestion_params = IngestionParams(
     clear_data=True,  # Clear existing data before ingesting
-    # Optional: ingest only rows in this date range (requires datetime_columns in create_patterns
+    # Optional: ingest only rows in this date range (requires datetime_columns in create_bindings
     # or datetime_column below)
     # datetime_after="2020-01-01",
     # datetime_before="2021-01-01",
-    # datetime_column="created_at",  # default column when a pattern has no date_field
+    # datetime_column="created_at",  # default column when a connector has no date_field
 )
 
 engine.define_and_ingest(
-    schema=schema,
+    manifest=manifest.model_copy(update={"bindings": bindings}),
     target_db_config=target_config,  # Target graph database config
-    patterns=patterns,  # PostgreSQL table patterns
     ingestion_params=ingestion_params,
     recreate_schema=True,  # Drop existing schema and define new one before ingesting
 )
@@ -453,10 +454,12 @@ db_type = target_config.connection_type
 
 # Create GraphEngine and infer schema
 engine = GraphEngine(target_db_flavor=db_type)
-schema = engine.infer_schema(
+manifest = engine.infer_schema(
     postgres_conf,
     schema_name="public",
 )
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Step 5: Save inferred schema to YAML (optional)
 schema_output_file = Path("generated-schema.yaml")
@@ -464,9 +467,9 @@ with open(schema_output_file, "w") as f:
     yaml.safe_dump(schema.to_dict(), f, default_flow_style=False, sort_keys=False)
 logger.info(f"Inferred schema saved to {schema_output_file}")
 
-# Step 6: Create Patterns from PostgreSQL tables
+# Step 6: Create Bindings from PostgreSQL tables
 engine = GraphEngine()
-patterns = engine.create_patterns(postgres_conf, schema_name="public")
+bindings = engine.create_bindings(postgres_conf, schema_name="public")
 
 # Step 7: Define schema and ingest data
 ingestion_params = IngestionParams(
@@ -474,10 +477,11 @@ ingestion_params = IngestionParams(
 )
 
 # Use GraphEngine to define schema and ingest data
+ingest_manifest = manifest.model_copy(update={"bindings": bindings})
+ingest_manifest.finish_init()
 engine.define_and_ingest(
-    schema=schema,
+    manifest=ingest_manifest,
     target_db_config=target_config,
-    patterns=patterns,
     ingestion_params=ingestion_params,
     recreate_schema=True,  # Drop existing schema and define new one before ingesting
 )
@@ -485,10 +489,10 @@ engine.define_and_ingest(
 print("\n" + "=" * 80)
 print("Ingestion complete!")
 print("=" * 80)
-print(f"Schema: {schema.general.name}")
-print(f"Vertices: {len(schema.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.edge_config.edges_list()))}")
-print(f"Resources: {len(schema.resources)}")
+print(f"Schema: {schema.metadata.name}")
+print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
+print(f"Edges: {len(list(schema.graph.edge_config.edges_list()))}")
+print(f"Resources: {len(ingestion_model.resources)}")
 print("=" * 80)
 
 # View the ingested data in your graph database's web interface:
@@ -559,69 +563,72 @@ The `follows` resource creates self-referential edges between `users` vertices:
 The inferred schema will look like this:
 
 ```yaml
-general:
+schema:
+  metadata:
     name: public
-vertex_config:
-    vertices:
-    -   name: products
+  graph:
+    vertex_config:
+      vertices:
+      - name: products
         fields:
-        -   name: id
-            type: INT
-        -   name: name
-            type: STRING
-        -   name: price
-            type: FLOAT
-        -   name: description
-            type: STRING
-        -   name: created_at
-            type: DATETIME
+        - name: id
+          type: INT
+        - name: name
+          type: STRING
+        - name: price
+          type: FLOAT
+        - name: description
+          type: STRING
+        - name: created_at
+          type: DATETIME
         indexes:
-        -   fields: [id]
-    -   name: users
+        - fields: [id]
+      - name: users
         fields:
-        -   name: id
-            type: INT
-        -   name: name
-            type: STRING
-        -   name: email
-            type: STRING
-        -   name: created_at
-            type: DATETIME
+        - name: id
+          type: INT
+        - name: name
+          type: STRING
+        - name: email
+          type: STRING
+        - name: created_at
+          type: DATETIME
         indexes:
-        -   fields: [id]
-edge_config:
-    edges:
-    -   source: users
+        - fields: [id]
+    edge_config:
+      edges:
+      - source: users
         target: products
         weights:
-            direct:
-            -   name: purchase_date
-            -   name: quantity
-            -   name: total_amount
-    -   source: users
+          direct:
+          - name: purchase_date
+          - name: quantity
+          - name: total_amount
+      - source: users
         target: users
         weights:
-            direct:
-            -   name: created_at
-resources:
--   resource_name: products
+          direct:
+          - name: created_at
+ingestion_model:
+  resources:
+  - resource_name: products
     apply:
-    -   vertex: products
--   resource_name: users
+    - vertex: products
+  - resource_name: users
     apply:
-    -   vertex: users
--   resource_name: purchases
+    - vertex: users
+  - resource_name: purchases
     apply:
-    -   vertex: users
-        "from": {id: user_id}
-    -   vertex: products
-        "from": {id: product_id}
--   resource_name: follows
+    - vertex: users
+      "from": {id: user_id}
+    - vertex: products
+      "from": {id: product_id}
+  - resource_name: follows
     apply:
-    -   vertex: users
-        "from": {id: follower_id}
-    -   vertex: users
-        "from": {id: followed_id}
+    - vertex: users
+      "from": {id: follower_id}
+    - vertex: users
+      "from": {id: followed_id}
 ```
 
 ## Key Features
@@ -674,7 +681,7 @@ Understanding how data flows from PostgreSQL to the graph database:
 
 1. **Connection**: Establish connection to PostgreSQL database
 2. **Schema Inference**: Analyze database structure and generate graflo Schema
-3. **Pattern Creation**: Create patterns that map PostgreSQL tables to resources
+3. **Bindings Creation**: Create bindings that map PostgreSQL tables to resources
 4. **Ingestion Process**:
    - For each resource, query the corresponding PostgreSQL table
    - Transform each row according to the resource mapping
@@ -727,26 +734,28 @@ After inference, you can modify the schema:
 # Connection is automatically managed inside infer_schema()
 postgres_conf = PostgresConfig.from_docker_env()
 engine = GraphEngine()
-schema = engine.infer_schema(postgres_conf, schema_name="public")
+manifest = engine.infer_schema(postgres_conf, schema_name="public")
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Modify schema as needed
 # Add custom transforms, filters, or additional edges
-schema.vertex_config.vertices[0].filters.append(...)
+schema.graph.vertex_config.vertices[0].filters.append(...)
 
 # Use modified schema
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 ```
 
-### Manual Pattern Creation
+### Manual Connector Creation
 
-You can also create patterns manually for more control:
+You can also create bindings manually for more control:
 
 ```python
-from graflo.util.onto import Patterns, TablePattern
+from graflo.architecture.bindings import Bindings, TableConnector
 
-patterns = Patterns(
+bindings = Bindings(
     _resource_mapping={
-        "users": ("db1", "users"),      # (config_key, table_name)
+        "users": ("db1", "users"),  # (config_key, table_name)
         "products": ("db1", "products"),
     },
     _postgres_connections={

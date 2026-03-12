@@ -6,8 +6,8 @@ and Neo4j.
 
 Key Components:
     - Caster: Main class for data casting and ingestion
-    - FilePattern: Pattern matching for file discovery
-    - Patterns: Collection of file patterns for different resources
+    - FileConnector: Connector matching for file discovery
+    - Connectors: Collection of file connectors for different resources
 
 Example:
     >>> caster = Caster(schema=schema)
@@ -36,7 +36,7 @@ from graflo.db import DBConfig
 from graflo.hq.db_writer import DBWriter
 from graflo.hq.registry_builder import RegistryBuilder
 from graflo.util.chunker import ChunkerType
-from graflo.util.onto import Bindings
+from graflo.architecture.bindings import Bindings
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +60,8 @@ class IngestionParams(BaseModel):
             Rows with date_column >= datetime_after are included. Used with SQL/table sources.
         datetime_before: Exclusive upper bound for datetime filtering (ISO format).
             Rows with date_column < datetime_before are included. Range is [datetime_after, datetime_before).
-        datetime_column: Default column name for datetime filtering when the pattern does not
-            specify date_field. Per-table override: set date_field on TablePattern (or FilePattern).
+        datetime_column: Default column name for datetime filtering when the connector does not
+            specify date_field. Per-table override: set date_field on TableConnector (or FileConnector).
     """
 
     clear_data: bool = False

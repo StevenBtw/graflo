@@ -1,7 +1,7 @@
 """Build a :class:`DataSourceRegistry` from :class:`Bindings` and schema models.
 
 Handles file discovery, SQL table source creation (with auto-JOIN
-enrichment and datetime filtering), and pattern dispatch by resource type.
+enrichment and datetime filtering), and connector dispatch by resource type.
 """
 
 from __future__ import annotations
@@ -15,11 +15,16 @@ from graflo.architecture.schema import IngestionModel, Schema
 from graflo.data_source import DataSourceFactory, DataSourceRegistry
 from graflo.data_source.sql import SQLConfig, SQLDataSource
 from graflo.filter.sql import datetime_range_where_sql
-from graflo.util.onto import FilePattern, ResourceType, SparqlPattern, TablePattern
+from graflo.architecture.bindings import (
+    FileConnector,
+    ResourceType,
+    SparqlConnector,
+    TableConnector,
+)
 
 if TYPE_CHECKING:
     from graflo.hq.caster import IngestionParams
-    from graflo.util.onto import Bindings
+    from graflo.architecture.bindings import Bindings
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +51,7 @@ class RegistryBuilder:
     ) -> DataSourceRegistry:
         """Return a populated :class:`DataSourceRegistry`.
 
-        Iterates over every resource in the schema, looks up its pattern and
+        Iterates over every resource in the schema, looks up its connector and
         resource type, then delegates to the appropriate registration helper.
         """
         registry = DataSourceRegistry()
@@ -61,41 +66,41 @@ class RegistryBuilder:
                 )
                 continue
 
-            pattern = bindings.patterns.get(resource_name)
-            if pattern is None:
+            connector = bindings.connectors.get(resource_name)
+            if connector is None:
                 logger.warning(
-                    f"No pattern found for resource '{resource_name}', skipping"
+                    f"No connector found for resource '{resource_name}', skipping"
                 )
                 continue
 
             if resource_type == ResourceType.FILE:
-                if not isinstance(pattern, FilePattern):
+                if not isinstance(connector, FileConnector):
                     logger.warning(
-                        f"Pattern for resource '{resource_name}' is not a FilePattern, skipping"
+                        f"Connector for resource '{resource_name}' is not a FileConnector, skipping"
                     )
                     continue
                 self._register_file_sources(
-                    registry, resource_name, pattern, ingestion_params
+                    registry, resource_name, connector, ingestion_params
                 )
 
             elif resource_type == ResourceType.SQL_TABLE:
-                if not isinstance(pattern, TablePattern):
+                if not isinstance(connector, TableConnector):
                     logger.warning(
-                        f"Pattern for resource '{resource_name}' is not a TablePattern, skipping"
+                        f"Connector for resource '{resource_name}' is not a TableConnector, skipping"
                     )
                     continue
                 self._register_sql_table_sources(
-                    registry, resource_name, pattern, bindings, ingestion_params
+                    registry, resource_name, connector, bindings, ingestion_params
                 )
 
             elif resource_type == ResourceType.SPARQL:
-                if not isinstance(pattern, SparqlPattern):
+                if not isinstance(connector, SparqlConnector):
                     logger.warning(
-                        f"Pattern for resource '{resource_name}' is not a SparqlPattern, skipping"
+                        f"Connector for resource '{resource_name}' is not a SparqlConnector, skipping"
                     )
                     continue
                 self._register_sparql_sources(
-                    registry, resource_name, pattern, bindings, ingestion_params
+                    registry, resource_name, connector, bindings, ingestion_params
                 )
 
             else:
@@ -111,20 +116,20 @@ class RegistryBuilder:
 
     @staticmethod
     def discover_files(
-        fpath: Path | str, pattern: FilePattern, limit_files: int | None = None
+        fpath: Path | str, connector: FileConnector, limit_files: int | None = None
     ) -> list[Path]:
-        """Discover files matching *pattern* in a directory.
+        """Discover files matching *connector* in a directory.
 
         Args:
             fpath: Directory to search in.
-            pattern: Pattern to match files against.
+            connector: Connector used to match files.
             limit_files: Optional cap on the number of files returned.
 
         Returns:
             Matching file paths.
         """
-        if pattern.sub_path is None:
-            raise ValueError("pattern.sub_path is required")
+        if connector.sub_path is None:
+            raise ValueError("connector.sub_path is required")
         path = Path(fpath) if isinstance(fpath, str) else fpath
 
         files = [
@@ -133,8 +138,8 @@ class RegistryBuilder:
             if f.is_file()
             and (
                 True
-                if pattern.regex is None
-                else re.search(pattern.regex, f.name) is not None
+                if connector.regex is None
+                else re.search(connector.regex, f.name) is not None
             )
         ]
 
@@ -147,18 +152,18 @@ class RegistryBuilder:
         self,
         registry: DataSourceRegistry,
         resource_name: str,
-        pattern: FilePattern,
+        connector: FileConnector,
         ingestion_params: IngestionParams,
     ) -> None:
-        if pattern.sub_path is None:
+        if connector.sub_path is None:
             logger.warning(
-                f"FilePattern for resource '{resource_name}' has no sub_path, skipping"
+                f"FileConnector for resource '{resource_name}' has no sub_path, skipping"
             )
             return
 
-        path_obj = pattern.sub_path.expanduser()
+        path_obj = connector.sub_path.expanduser()
         files = self.discover_files(
-            path_obj, limit_files=ingestion_params.limit_files, pattern=pattern
+            path_obj, limit_files=ingestion_params.limit_files, connector=connector
         )
         logger.info(f"For resource name {resource_name} {len(files)} files were found")
 
@@ -174,7 +179,7 @@ class RegistryBuilder:
         self,
         registry: DataSourceRegistry,
         resource_name: str,
-        pattern: TablePattern,
+        connector: TableConnector,
         bindings: Bindings,
         ingestion_params: IngestionParams,
     ) -> None:
@@ -185,10 +190,10 @@ class RegistryBuilder:
 
         When the matching Resource has edge actors with ``match_source`` /
         ``match_target`` and the source/target vertex types have known
-        TablePatterns, JoinClauses and IS_NOT_NULL filters are auto-generated
-        on the pattern before building the SQL query.
+        table connectors, JoinClauses and IS_NOT_NULL filters are auto-generated
+        on the connector before building the SQL query.
         """
-        from graflo.hq.auto_join import enrich_edge_pattern_with_joins
+        from graflo.hq.auto_join import enrich_edge_connector_with_joins
 
         postgres_config = bindings.get_postgres_config(resource_name)
         if postgres_config is None:
@@ -209,15 +214,15 @@ class RegistryBuilder:
 
         try:
             resource = self.ingestion_model.fetch_resource(resource_name)
-            if pattern.view is None and not pattern.joins:
-                enrich_edge_pattern_with_joins(
+            if connector.view is None and not connector.joins:
+                enrich_edge_connector_with_joins(
                     resource=resource,
-                    pattern=pattern,
-                    patterns=bindings,
+                    connector=connector,
+                    bindings=bindings,
                     vertex_config=self.schema.graph.vertex_config,
                 )
 
-            date_column = pattern.date_field or ingestion_params.datetime_column
+            date_column = connector.date_field or ingestion_params.datetime_column
             if (
                 ingestion_params.datetime_after or ingestion_params.datetime_before
             ) and date_column:
@@ -226,13 +231,13 @@ class RegistryBuilder:
             elif ingestion_params.datetime_after or ingestion_params.datetime_before:
                 logger.warning(
                     "datetime_after/datetime_before set but no date column: "
-                    "set TablePattern.date_field or IngestionParams.datetime_column for resource %s",
+                    "set TableConnector.date_field or IngestionParams.datetime_column for resource %s",
                     resource_name,
                 )
 
-            query = pattern.build_query(effective_schema)
+            query = connector.build_query(effective_schema)
 
-            if date_column and date_column != pattern.date_field:
+            if date_column and date_column != connector.date_field:
                 dt_where = datetime_range_where_sql(
                     ingestion_params.datetime_after,
                     ingestion_params.datetime_before,
@@ -275,7 +280,7 @@ class RegistryBuilder:
         self,
         registry: DataSourceRegistry,
         resource_name: str,
-        pattern: SparqlPattern,
+        connector: SparqlConnector,
         bindings: "Bindings",
         ingestion_params: "IngestionParams",
     ) -> None:
@@ -283,14 +288,14 @@ class RegistryBuilder:
 
         Handles two modes:
 
-        * **Endpoint mode** (``pattern.endpoint_url`` is set): creates a
+        * **Endpoint mode** (``connector.endpoint_url`` is set): creates a
           :class:`SparqlEndpointDataSource` that queries the remote SPARQL
           endpoint.
-        * **File mode** (``pattern.rdf_file`` is set): creates an
+        * **File mode** (``connector.rdf_file`` is set): creates an
           :class:`RdfFileDataSource` that parses a local RDF file.
         """
         try:
-            if pattern.endpoint_url:
+            if connector.endpoint_url:
                 from graflo.data_source.rdf import (
                     SparqlEndpointDataSource,
                     SparqlSourceConfig,
@@ -305,10 +310,10 @@ class RegistryBuilder:
                 )
 
                 source_config = SparqlSourceConfig(
-                    endpoint_url=pattern.endpoint_url,
-                    rdf_class=pattern.rdf_class,
-                    graph_uri=pattern.graph_uri,
-                    sparql_query=pattern.sparql_query,
+                    endpoint_url=connector.endpoint_url,
+                    rdf_class=connector.rdf_class,
+                    graph_uri=connector.graph_uri,
+                    sparql_query=connector.sparql_query,
                     username=username,
                     password=password,
                     page_size=ingestion_params.batch_size,
@@ -319,31 +324,31 @@ class RegistryBuilder:
                 logger.info(
                     "Created SPARQL endpoint data source for class <%s> at '%s' "
                     "mapped to resource '%s'",
-                    pattern.rdf_class,
-                    pattern.endpoint_url,
+                    connector.rdf_class,
+                    connector.endpoint_url,
                     resource_name,
                 )
 
-            elif pattern.rdf_file:
+            elif connector.rdf_file:
                 from graflo.data_source.rdf import RdfFileDataSource
 
                 rdf_source = RdfFileDataSource(
-                    path=pattern.rdf_file,
-                    rdf_class=pattern.rdf_class,
+                    path=connector.rdf_file,
+                    rdf_class=connector.rdf_class,
                 )
                 registry.register(rdf_source, resource_name=resource_name)
 
                 logger.info(
                     "Created RDF file data source for class <%s> from '%s' "
                     "mapped to resource '%s'",
-                    pattern.rdf_class,
-                    pattern.rdf_file,
+                    connector.rdf_class,
+                    connector.rdf_file,
                     resource_name,
                 )
 
             else:
                 logger.warning(
-                    "SparqlPattern for resource '%s' has neither endpoint_url nor "
+                    "SparqlConnector for resource '%s' has neither endpoint_url nor "
                     "rdf_file set, skipping",
                     resource_name,
                 )

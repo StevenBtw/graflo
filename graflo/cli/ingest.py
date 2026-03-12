@@ -7,7 +7,7 @@ both initial database setup and incremental data ingestion.
 Key Features:
     - Configurable batch processing
     - Multi-core and multi-threaded execution
-    - Support for custom resource patterns
+    - Support for custom resource connectors
     - Database initialization and cleanup options
     - Flexible file discovery and processing
 
@@ -28,7 +28,7 @@ from os.path import dirname, join, realpath
 import click
 from suthing import FileHandle
 
-from graflo import Bindings, DataSourceRegistry, DBType, IngestionModel, Schema
+from graflo import Bindings, DataSourceRegistry, DBType, GraphManifest
 from graflo.db import DBConfig
 from graflo.data_source import DataSourceFactory
 from graflo.hq import GraphEngine
@@ -54,9 +54,17 @@ logger = logging.getLogger(__name__)
     help="Path to source data directory (required if not using --data-source-config-path)",
 )
 @click.option(
-    "--resource-pattern-config-path",
+    "--resource-connector-config-path",
+    "resource_connector_config_path",
     type=click.Path(exists=True, path_type=pathlib.Path),
     default=None,
+)
+@click.option(
+    "--resource-pattern-config-path",
+    "resource_connector_config_path",
+    type=click.Path(exists=True, path_type=pathlib.Path),
+    default=None,
+    hidden=True,
 )
 @click.option(
     "--data-source-config-path",
@@ -88,7 +96,7 @@ def ingest(
     n_cores,
     fresh_start,
     init_only,
-    resource_pattern_config_path,
+    resource_connector_config_path,
     data_source_config_path,
 ):
     """Ingest data into a graph database.
@@ -106,7 +114,7 @@ def ingest(
         n_cores: Number of CPU cores/threads to use for parallel processing (default: 1)
         fresh_start: Whether to wipe existing database before ingestion
         init_only: Whether to only initialize the database without ingestion
-        resource_pattern_config_path: Optional path to resource pattern configuration
+        resource_connector_config_path: Optional path to resource connector configuration
 
     Example:
         $ uv run ingest \\
@@ -125,17 +133,19 @@ def ingest(
 
     logging.basicConfig(level=logging.INFO)
 
-    schema_raw = FileHandle.load(schema_path)
-    schema = Schema.from_config(schema_raw)
-    ingestion_model = IngestionModel.from_config(schema_raw)
-    schema.bind_ingestion_model(ingestion_model)
+    manifest = GraphManifest.from_config(FileHandle.load(schema_path))
+    manifest.finish_init()
+    schema = manifest.require_schema()
+    ingestion_model = manifest.require_ingestion_model()
 
     # Load config from file
     config_data = FileHandle.load(db_config_path)
     conn_conf = DBConfig.from_dict(config_data)
 
-    if resource_pattern_config_path is not None:
-        bindings = Bindings.from_dict(FileHandle.load(resource_pattern_config_path))
+    if resource_connector_config_path is not None:
+        bindings = Bindings.from_dict(FileHandle.load(resource_connector_config_path))
+    elif manifest.bindings is not None:
+        bindings = manifest.bindings
     else:
         bindings = Bindings()
 
@@ -168,7 +178,7 @@ def ingest(
     # Define schema first (if recreate_schema is requested)
     if fresh_start:
         engine.define_schema(
-            schema=schema,
+            manifest=manifest,
             target_db_config=conn_conf,
             recreate_schema=True,
         )
@@ -200,7 +210,7 @@ def ingest(
                 registry.register(data_source, resource_name=resource_name)
 
         # For data source registry, we need to use Caster directly
-        # since GraphEngine.ingest() uses patterns, not registry
+        # since GraphEngine.ingest() uses bindings, not registry
         from graflo.hq.caster import Caster
 
         caster = Caster(
@@ -217,11 +227,11 @@ def ingest(
         )
     else:
         # Fall back to file-based ingestion using GraphEngine
+        ingest_manifest = manifest.model_copy(update={"bindings": bindings})
+        ingest_manifest.finish_init()
         engine.ingest(
-            schema=schema,
-            ingestion_model=ingestion_model,
+            manifest=ingest_manifest,
             target_db_config=conn_conf,
-            bindings=bindings,
             ingestion_params=ingestion_params,
         )
 

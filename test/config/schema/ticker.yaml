@@ -1,78 +1,79 @@
-metadata:
-    name: ticker_history
-graph:
-    vertex_config:
-        vertices:
-        -   name: ticker
-            fields:
-            -   cusip
-            -   cname
-            -   oftic
-            identity:
-            -   cusip
-            -   cname
-            -   oftic
-        -   name: feature
-            fields:
-            -   name
-            -   value
-            identity:
-            -   name
-            -   value
-            filters:
-            -   or:
-                -   if_then:
-                    -   field: name
-                        foo: __eq__
-                        value: Open
-                    -   field: value
-                        foo: __gt__
-                        value: 0
-                -   if_then:
-                    -   field: name
-                        foo: __eq__
-                        value: Close
-                    -   field: value
-                        foo: __gt__
-                        value: 0
-            -   field: name
-                foo: __ne__
-                value: Volume
-    edge_config:
-        edges:
+schema:
+    metadata:
+        name: ticker_history
+    graph:
+        vertex_config:
+            vertices:
+            -   name: ticker
+                fields:
+                -   cusip
+                -   cname
+                -   oftic
+                identity:
+                -   cusip
+                -   cname
+                -   oftic
+            -   name: feature
+                fields:
+                -   name
+                -   value
+                identity:
+                -   name
+                -   value
+                filters:
+                -   or:
+                    -   if_then:
+                        -   field: name
+                            foo: __eq__
+                            value: Open
+                        -   field: value
+                            foo: __gt__
+                            value: 0
+                    -   if_then:
+                        -   field: name
+                            foo: __eq__
+                            value: Close
+                        -   field: value
+                            foo: __gt__
+                            value: 0
+                -   field: name
+                    foo: __ne__
+                    value: Volume
+        edge_config:
+            edges:
+            -   source: ticker
+                target: feature
+                weights:
+                    direct:
+                    -   t_obs
+                    vertices:
+                    -   name: feature
+                        fields:
+                        -   name
+    db_profile:
+        vertex_storage_names:
+            ticker: tickers
+            feature: features
+        vertex_indexes:
+            feature:
+            -   type: hash
+                unique: false
+                fields:
+                -   value
+            -   type: hash
+                unique: false
+                fields:
+                -   name
+        edge_indexes:
         -   source: ticker
             target: feature
-            weights:
-                direct:
+            purpose:
+            indexes:
+            -   fields:
+                -   _from
+                -   _to
                 -   t_obs
-                vertices:
-                -   name: feature
-                    fields:
-                    -   name
-db_profile:
-    vertex_storage_names:
-        ticker: tickers
-        feature: features
-    vertex_indexes:
-        feature:
-        -   type: hash
-            unique: false
-            fields:
-            -   value
-        -   type: hash
-            unique: false
-            fields:
-            -   name
-    edge_indexes:
-    -   source: ticker
-        target: feature
-        purpose:
-        indexes:
-        -   fields:
-            -   _from
-            -   _to
-            -   t_obs
-            -   name
+                -   name
 ingestion_model:
     resources:
     -   resource_name: history
@@ -108,3 +109,4 @@ ingestion_model:
                 Date: t_obs
         -   map:
                 __ticker: oftic
+bindings: {}

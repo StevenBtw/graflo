@@ -69,14 +69,14 @@ class TestRdfInferenceManager:
         assert schema.metadata.name == "my_ontology"
 
     def test_create_bindings(self, sample_ontology_path: Path):
-        """Bindings should contain one SparqlPattern per class."""
+        """Bindings should contain one SparqlConnector per class."""
         mgr = RdfInferenceManager()
-        patterns = mgr.create_bindings(sample_ontology_path)
+        bindings = mgr.create_bindings(sample_ontology_path)
 
-        assert "Person" in patterns.sparql_patterns
-        assert "Organization" in patterns.sparql_patterns
+        assert "Person" in bindings.sparql_connectors
+        assert "Organization" in bindings.sparql_connectors
 
-        person_pat = patterns.sparql_patterns["Person"]
+        person_pat = bindings.sparql_connectors["Person"]
         assert person_pat.rdf_class == "http://example.org/Person"
         assert person_pat.rdf_file is not None
 
@@ -84,9 +84,9 @@ class TestRdfInferenceManager:
         """When endpoint_url is given, bindings should reference it."""
         mgr = RdfInferenceManager()
         endpoint = "http://localhost:3030/test/sparql"
-        patterns = mgr.create_bindings(sample_ontology_path, endpoint_url=endpoint)
+        bindings = mgr.create_bindings(sample_ontology_path, endpoint_url=endpoint)
 
-        for pat in patterns.sparql_patterns.values():
+        for pat in bindings.sparql_connectors.values():
             assert pat.endpoint_url == endpoint
             assert pat.rdf_file is None
 

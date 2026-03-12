@@ -8,8 +8,8 @@ does not depend on itself. Related to actor_util._iter_emitter_receiver_group_pa
 import pytest
 from suthing import FileHandle
 
+from graflo.architecture.manifest import GraphManifest
 from graflo.architecture.onto import GraphContainer
-from graflo.architecture.schema import IngestionModel, Schema
 
 
 DOC_0XFFFF = {
@@ -88,11 +88,11 @@ BUGS_0AD = [
 
 @pytest.fixture
 def schema_debian_eco():
-    schema_dict = FileHandle.load("test.config.schema", "debian-eco.yaml")
-    schema = Schema.from_config(schema_dict)
-    ingestion_model = IngestionModel.from_config(schema_dict)
-    schema.bind_ingestion_model(ingestion_model)
-    return schema
+    manifest = GraphManifest.from_config(
+        FileHandle.load("test.config.schema", "debian-eco.yaml")
+    )
+    manifest.finish_init()
+    return manifest
 
 
 def test_0xffff_no_spurious_self_edge(schema_debian_eco):
@@ -102,8 +102,7 @@ def test_0xffff_no_spurious_self_edge(schema_debian_eco):
     would indicate a bug in actor_util._iter_emitter_receiver_group_pairs when
     handling package->package edges with relation_from_key.
     """
-    ingestion_model = schema_debian_eco.ingestion_model
-    assert ingestion_model is not None
+    ingestion_model = schema_debian_eco.require_ingestion_model()
     resource = ingestion_model.fetch_resource("package")
     doc_result = resource(DOC_0XFFFF)
     graph = GraphContainer.from_docs_list([doc_result])
@@ -133,8 +132,7 @@ def test_bugs_0ad_no_spurious_package_self_edge(schema_debian_eco):
     population, inferred package->package edges must not create a spurious 0ad->0ad
     self-edge.
     """
-    ingestion_model = schema_debian_eco.ingestion_model
-    assert ingestion_model is not None
+    ingestion_model = schema_debian_eco.require_ingestion_model()
     resource = ingestion_model.fetch_resource("bug")
     docs = [resource(bug) for bug in BUGS_0AD]
     graph = GraphContainer.from_docs_list(docs)

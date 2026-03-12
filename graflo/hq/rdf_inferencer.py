@@ -34,7 +34,7 @@ from graflo.architecture.schema import (
 )
 from graflo.architecture.vertex import Field as VertexField, Vertex, VertexConfig
 from graflo.onto import DBType
-from graflo.util.onto import Bindings, SparqlPattern
+from graflo.architecture.bindings import Bindings, SparqlConnector
 
 logger = logging.getLogger(__name__)
 
@@ -224,9 +224,9 @@ class RdfInferenceManager:
     ) -> Bindings:
         """Create :class:`Bindings` from an RDF ontology.
 
-        One :class:`SparqlPattern` is created per ``owl:Class`` / ``rdfs:Class``.
+        One :class:`SparqlConnector` is created per ``owl:Class`` / ``rdfs:Class``.
         The ontology is always loaded from *source* (a local file).  The
-        *endpoint_url* is attached to each pattern for runtime data queries
+        *endpoint_url* is attached to each connector for runtime data queries
         but is **not** used to load the ontology itself.
 
         Args:
@@ -235,7 +235,7 @@ class RdfInferenceManager:
             graph_uri: Named graph containing the data.
 
         Returns:
-            Bindings with one SparqlPattern per class.
+            Bindings with one SparqlConnector per class.
         """
         from rdflib import OWL, RDF, RDFS
 
@@ -255,18 +255,19 @@ class RdfInferenceManager:
             ):
                 classes[name] = uri_str
 
-        patterns = Bindings()
+        bindings = Bindings()
         for cls_name, cls_uri in classes.items():
-            sp = SparqlPattern(
+            connector = SparqlConnector(
                 rdf_class=cls_uri,
                 endpoint_url=endpoint_url,
                 graph_uri=graph_uri,
                 rdf_file=Path(source) if not endpoint_url else None,
                 resource_name=cls_name,
             )
-            patterns.add_sparql_pattern(cls_name, sp)
+            bindings.add_sparql_connector(cls_name, connector)
 
         logger.info(
-            "Created %d SPARQL patterns from ontology", len(patterns.sparql_patterns)
+            "Created %d SPARQL connectors from ontology",
+            len(bindings.sparql_connectors),
         )
-        return patterns
+        return bindings
