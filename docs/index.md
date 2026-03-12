@@ -75,6 +75,8 @@ The `DataSourceRegistry` manages `AbstractDataSource` adapters, each carrying a 
 - **DataSourceRegistry** — Register `FILE`, `SQL`, `API`, `IN_MEMORY`, or `SPARQL` data sources. Each `DataSourceType` plugs into the same Resource pipeline.
 - **SPARQL & RDF support** — Query SPARQL endpoints (e.g. Apache Fuseki), read `.ttl`/`.rdf`/`.n3` files, and auto-infer schemas from OWL/RDFS ontologies. Install with `pip install graflo[sparql]`.
 - **Schema inference** — Generate graph schemas from PostgreSQL 3NF databases (PK/FK heuristics) or from OWL/RDFS ontologies. See [Example 5](examples/example-5.md).
+- **Schema migration planning/execution** — Generate typed migration plans between schema versions, apply low-risk additive changes with risk gates, and track revision history via `migrate_schema`.
+  - Compare `from` and `to` schemas before execution to preview structural deltas and blocked high-risk operations.
 - **Typed fields** — Vertex fields and edge weights carry types for validation and database-specific optimisation.
 - **Parallel batch processing** — Configurable batch sizes and multi-core execution.
 - **Advanced filtering** — Server-side filtering (e.g. TigerGraph REST++ API), client-side filter expressions, and **SelectSpec** for declarative SQL view/filter control before data reaches Resources.
@@ -85,6 +87,8 @@ The `DataSourceRegistry` manages `AbstractDataSource` adapters, each carrying a 
 - [Installation](getting_started/installation.md)
 - [Quick Start Guide](getting_started/quickstart.md)
 - [Concepts (architecture diagrams)](concepts/index.md)
+- [Concepts — Schema Migration](concepts/index.md#schema-migration-v1)
+- [Concepts — Comparing Two Schemas](concepts/index.md#comparing-two-schemas)
 - [API Reference](reference/index.md)
 - [Examples](examples/index.md)
 

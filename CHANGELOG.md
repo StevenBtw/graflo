@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+- **Schema migration framework (v1)**:
+  - New `graflo.migrate` package with typed migration models, schema diffing, risk classification, planning, execution, and file-backed history store
+  - New operation typing via `OperationType` enum (`StrEnum`) for safer operation ordering and classification
+  - New migration executor with risk gates (safe-by-default; low-risk additive operations in v1)
+  - New backend emitters for ArangoDB and Neo4j (v1 additive operation subset)
+  - New CLI entrypoint `migrate_schema` with commands:
+    - `plan` (read-only schema comparison and migration plan generation)
+    - `apply` (dry-run or apply with revision and hash checks)
+    - `status` and `history` (migration state visibility)
+  - New migration ADR in `planning/graflo-migration-adr.md` documenting normalization rules, risk policy, rename policy, and backend capability matrix
+  - New migration test suite in `test/migrate/` (diff, planner, store, executor)
+
+### Documentation
+- Extended migration docs in Concepts:
+  - command examples for `plan`, `apply`, `status`, `history`
+  - explicit guidance on schema comparison (`from` vs `to`) and risk interpretation
+  - analogy-based explanation to make migration planning behavior easier to reason about
+
 ## [1.6.6] - 2026-03-05
 
 ### Added

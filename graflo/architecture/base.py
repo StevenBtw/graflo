@@ -70,11 +70,12 @@ class ConfigBaseModel(BaseModel):
         Supports skip_defaults=True (mapped to exclude_defaults) for backward
         compatibility with dataclass-wizard style APIs.
         """
-        if kwargs.get("skip_defaults"):
+        if "skip_defaults" in kwargs:
             kwargs = dict(kwargs)
-            kwargs.pop("skip_defaults", None)
-            kwargs["exclude_defaults"] = True
-        return self.model_dump(by_alias=True, exclude_none=True, **kwargs)
+            skip_defaults = bool(kwargs.pop("skip_defaults"))
+            if skip_defaults:
+                kwargs["exclude_defaults"] = True
+        return self.model_dump(mode="json", by_alias=True, exclude_none=True, **kwargs)
 
     def update(self, other: Self) -> None:
         """Update this instance with values from another instance of the same type.

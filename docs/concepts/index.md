@@ -707,6 +707,81 @@ resources:
 - **RDF / OWL Schema Inference** — infer schemas from OWL/RDFS ontologies: `owl:Class` → vertices, `owl:ObjectProperty` → edges, `owl:DatatypeProperty` → vertex fields.
 - **SelectSpec** — declarative view specification for advanced filtering and projection of SQL data before feeding into Resources. Use `TablePattern.view` with `SelectSpec` (full SQL-like `select` or `type_lookup` shorthand for edge tables with FK-based type resolution) to control exactly what data is queried.
 
+### Schema Migration (v1)
+- **Read-only planning first** — use `migrate_schema plan --from-schema-path ... --to-schema-path ...` to generate a deterministic operation plan before any writes.
+- **Risk-gated execution** — v1 executes only low-risk additive operations by default and blocks high-risk/destructive operations.
+- **Backend scope** — execution adapters are currently focused on ArangoDB and Neo4j; other backends are plan-first until adapter coverage is added.
+- **History and idempotency** — applied revisions are tracked in a migration manifest (`.graflo/migrations.json`) with revision + schema hash checks.
+- **Operational commands** — `plan`, `apply`, `status`, and `history` are exposed through the `migrate_schema` CLI entrypoint.
+
+#### Comparing Two Schemas
+
+When you compare schemas, treat it like comparing two building blueprints:
+
+- `--from-schema-path` is the **current building** blueprint.
+- `--to-schema-path` is the **target building** blueprint.
+- `migrate_schema plan` is the **architectural diff report** that tells you what must be added, changed, or removed to get from current to target.
+
+Another useful analogy is `git diff`, but for graph structure:
+
+- Additive changes (new vertex type, new edge, new field, new index) are similar to adding code in a backward-compatible way.
+- Destructive changes (removing fields/types, identity shifts) are similar to breaking API changes: they often require explicit migration steps, data sweeps, or rollouts.
+
+Practical comparison checklist:
+
+1. Run `plan` first and review operations grouped by risk.
+2. Confirm identity changes explicitly (identity shifts are high-impact).
+3. Validate whether each blocked operation needs a manual script, staged rollout, or explicit high-risk approval.
+4. Use `apply --dry-run` before any real apply.
+
+Example:
+
+```bash
+uv run migrate_schema plan \
+  --from-schema-path schema_v1.yaml \
+  --to-schema-path schema_v2.yaml \
+  --output-format json
+```
+
+How to read the output:
+
+- `operations`: runnable operations under current risk policy (v1 defaults to low-risk subset).
+- `blocked_operations`: operations intentionally withheld for safety.
+- `warnings`: policy and compatibility notes you should resolve before execution.
+
+#### Migration Command Examples
+
+```bash
+# Plan changes between two schema versions
+uv run migrate_schema plan \
+  --from-schema-path schema_v1.yaml \
+  --to-schema-path schema_v2.yaml
+
+# Dry-run apply to inspect backend actions
+uv run migrate_schema apply \
+  --from-schema-path schema_v1.yaml \
+  --to-schema-path schema_v2.yaml \
+  --db-config-path db.yaml \
+  --revision 0001_additive_updates \
+  --dry-run
+
+# Persist migration history after real execution
+uv run migrate_schema apply \
+  --from-schema-path schema_v1.yaml \
+  --to-schema-path schema_v2.yaml \
+  --db-config-path db.yaml \
+  --revision 0001_additive_updates \
+  --no-dry-run
+
+# Inspect migration state
+uv run migrate_schema status
+uv run migrate_schema history
+```
+
+#### Why This Helps
+
+Schema comparison gives you a predictable transition path between versions. Instead of discovering incompatibilities during ingestion, you see structural deltas in advance, gate risky steps, and execute a controlled rollout.
+
 ### Performance Optimization
 - **Batch Processing**: Process large datasets in configurable batches (`batch_size` parameter of `Caster`)
 - **Parallel Execution**: Utilize multiple cores for faster processing (`n_cores` parameter of `Caster`)

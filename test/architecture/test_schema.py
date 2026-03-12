@@ -1,9 +1,11 @@
 import logging
+from pathlib import Path
 
 from graflo.architecture.actor import EdgeActor, VertexActor
 from graflo.architecture.resource import Resource
 from graflo.architecture.schema import Schema
 from graflo.architecture.vertex import Vertex, VertexConfig
+from suthing import FileHandle
 
 logger = logging.getLogger(__name__)
 
@@ -602,3 +604,64 @@ def test_edge_purpose_specific_indexes_override_base_indexes():
     assert any(index.fields == ["pub_id"] for index in tmp_indexes)
     assert any(index.fields == ["obs_date"] for index in convolution_indexes)
     assert not any(index.fields == ["pub_id"] for index in convolution_indexes)
+
+
+def test_schema_default_dump_filename_uses_name_and_version():
+    schema = Schema.from_dict(
+        {
+            "general": {"name": "my graph", "version": "1.2.3"},
+            "vertex_config": {
+                "vertices": [
+                    {"name": "person", "fields": ["id"], "identity": ["id"]},
+                ]
+            },
+            "edge_config": {"edges": []},
+            "resources": [],
+        }
+    )
+    assert schema.default_dump_filename() == "my-graph-1.2.3.yaml"
+
+
+def test_schema_dump_defaults_to_name_version_and_excludes_defaults(tmp_path: Path):
+    schema = Schema.from_dict(
+        {
+            "general": {"name": "my_graph", "version": "2.0.0"},
+            "vertex_config": {
+                "vertices": [
+                    {
+                        "name": "person",
+                        "fields": [{"name": "id", "type": "STRING"}],
+                        "identity": ["id"],
+                    },
+                ]
+            },
+            "edge_config": {"edges": []},
+            "resources": [],
+        }
+    )
+
+    dumped_path = schema.dump(tmp_path)
+    assert dumped_path == tmp_path / "my_graph-2.0.0.yaml"
+    dumped = FileHandle.load(dumped_path)
+    # `db_flavor` is a DatabaseFeatures default and should be omitted.
+    assert dumped.get("database_features", {}).get("db_flavor") is None
+
+
+def test_schema_dump_can_include_defaults_when_requested(tmp_path: Path):
+    schema = Schema.from_dict(
+        {
+            "general": {"name": "graph", "version": "3.0.0"},
+            "vertex_config": {
+                "vertices": [
+                    {"name": "person", "fields": ["id"], "identity": ["id"]},
+                ]
+            },
+            "edge_config": {"edges": []},
+            "resources": [],
+        }
+    )
+    target_path = tmp_path / "explicit.yaml"
+    dumped_path = schema.dump(target_path, exclude_defaults=False)
+    assert dumped_path == target_path
+    dumped = FileHandle.load(dumped_path)
+    assert dumped["database_features"]["db_flavor"] == "arango"
