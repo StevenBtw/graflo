@@ -14,10 +14,10 @@ Key Features:
     - Filter expression system
 
 Example:
-    >>> from graflo import GraphEngine, Schema, IngestionParams
+    >>> from graflo import GraphEngine, IngestionParams
     >>> engine = GraphEngine()
-    >>> schema = engine.infer_schema(postgres_config)
-    >>> engine.define_and_ingest(schema, target_db_config)
+    >>> manifest = engine.infer_manifest(postgres_config)
+    >>> engine.define_and_ingest(manifest, target_db_config)
 """
 
 # --- Core orchestration ---------------------------------------------------
@@ -25,12 +25,24 @@ from .hq import Caster, GraphEngine, IngestionParams
 
 # --- Architecture ----------------------------------------------------------
 from .architecture import (
+    Bindings,
+    FileConnector,
+    GraphMetadata,
+    GraphManifest,
+    JoinClause,
+    DatabaseProfile,
     Edge,
     EdgeConfig,
     FieldType,
+    GraphModel,
     Index,
+    IngestionModel,
+    ResourceConnector,
+    ResourceType,
     Resource,
+    SparqlConnector,
     Schema,
+    TableConnector,
     Vertex,
     VertexConfig,
 )
@@ -61,7 +73,6 @@ from .filter import ComparisonOperator, FilterExpression, LogicalOperator
 
 # --- Enums & utilities -----------------------------------------------------
 from .onto import AggregationType, DBType
-from .util.onto import FilePattern, Patterns, ResourcePattern, TablePattern
 
 __all__ = [
     # Orchestration
@@ -70,6 +81,11 @@ __all__ = [
     "IngestionParams",
     # Architecture
     "Schema",
+    "GraphMetadata",
+    "GraphModel",
+    "DatabaseProfile",
+    "IngestionModel",
+    "GraphManifest",
     "Resource",
     "Vertex",
     "VertexConfig",
@@ -102,8 +118,11 @@ __all__ = [
     # Enums & utilities
     "AggregationType",
     "DBType",
-    "FilePattern",
-    "Patterns",
-    "ResourcePattern",
-    "TablePattern",
+    "FileConnector",
+    "Bindings",
+    "JoinClause",
+    "ResourceConnector",
+    "ResourceType",
+    "SparqlConnector",
+    "TableConnector",
 ]

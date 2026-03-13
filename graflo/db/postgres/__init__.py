@@ -11,13 +11,10 @@ Key Components:
 
 Example:
     >>> from graflo.hq import GraphEngine
-    >>> from graflo.db.postgres import PostgresConnection
     >>> from graflo.db import PostgresConfig
     >>> config = PostgresConfig.from_docker_env()
-    >>> conn = PostgresConnection(config)
     >>> engine = GraphEngine()
-    >>> schema = engine.infer_schema(conn, schema_name="public")
-    >>> conn.close()
+    >>> manifest = engine.infer_manifest(config, schema_name="public")
 """
 
 from .conn import PostgresConnection

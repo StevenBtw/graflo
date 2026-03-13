@@ -8,10 +8,10 @@ import pytest
 import yaml
 from suthing import FileHandle, equals
 
-from graflo.architecture.schema import Schema
+from graflo.architecture.manifest import GraphManifest
 from graflo.architecture.util import cast_graph_name_to_triple
 from graflo.util.misc import sorted_dicts
-from graflo.util.onto import Patterns, FilePattern
+from graflo.architecture.bindings import Bindings, FileConnector
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +71,14 @@ def fetch_schema_dict(mode):
     return schema_dict
 
 
+def fetch_manifest_obj(mode) -> GraphManifest:
+    manifest = GraphManifest.from_config(fetch_schema_dict(mode))
+    manifest.finish_init()
+    return manifest
+
+
 def fetch_schema_obj(mode):
-    schema_dict = fetch_schema_dict(mode)
-    schema_obj = Schema.from_dict(schema_dict)
-    return schema_obj
+    return fetch_manifest_obj(mode).require_schema()
 
 
 @pytest.fixture(scope="function")
@@ -92,19 +96,21 @@ def ingest_atomic(conn_conf, current_path, test_db_name, schema_o, mode, n_cores
 
     conn_conf.database = test_db_name
 
-    # Create Patterns for file-based resources
-    # Map each resource to a FilePattern that matches files in the data directory
-    patterns = Patterns()
-    for resource in schema_o.resources:
+    # Create Bindings for file-based resources
+    # Map each resource to a FileConnector that matches files in the data directory
+    bindings = Bindings()
+    ingestion_model = fetch_manifest_obj(mode).require_ingestion_model()
+    ingestion_model.finish_init(schema_o.graph)
+    for resource in ingestion_model.resources:
         resource_name = resource.name
-        # Create a FilePattern that matches files for this resource
-        # Use resource name as part of the filename pattern (e.g., "resource_name.csv", "resource_name.json", etc.)
-        file_pattern = FilePattern(
+        # Create a FileConnector that matches files for this resource
+        # Use resource name as part of the filename connector (e.g., "resource_name.csv", "resource_name.json", etc.)
+        file_connector = FileConnector(
             regex=f".*{resource_name}.*",
             sub_path=path,
             resource_name=resource_name,
         )
-        patterns.add_file_pattern(resource_name, file_pattern)
+        bindings.add_file_connector(resource_name, file_connector)
 
     # Determine DB flavor from connection config
     from graflo.hq import GraphEngine
@@ -114,10 +120,16 @@ def ingest_atomic(conn_conf, current_path, test_db_name, schema_o, mode, n_cores
 
     # Use GraphEngine for the full workflow
     engine = GraphEngine(target_db_flavor=db_type)
+    manifest = GraphManifest(
+        graph_schema=schema_o,
+        ingestion_model=ingestion_model,
+        bindings=bindings,
+    )
+    manifest.finish_init()
 
     # Define schema first (with recreate_schema=True)
     engine.define_schema(
-        schema=schema_o,
+        manifest=manifest,
         target_db_config=conn_conf,
         recreate_schema=True,
     )
@@ -125,9 +137,8 @@ def ingest_atomic(conn_conf, current_path, test_db_name, schema_o, mode, n_cores
     # Then ingest data
     ingestion_params = IngestionParams(n_cores=n_cores, clear_data=False)
     engine.ingest(
-        schema=schema_o,
+        manifest=manifest,
         target_db_config=conn_conf,
-        patterns=patterns,
         ingestion_params=ingestion_params,
     )
 

@@ -180,10 +180,13 @@ The ingestion process handles the complex nested structure:
 
 ```python
 from suthing import FileHandle
-from graflo import Caster, Patterns, Schema
+from graflo import Caster, Bindings, GraphManifest
 from graflo.db.connection.onto import Neo4jConfig
 
-schema = Schema.from_dict(FileHandle.load("schema.yaml"))
+manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Load config from docker/neo4j/.env (recommended)
 conn_conf = Neo4jConfig.from_docker_env()
@@ -196,22 +199,22 @@ conn_conf = Neo4jConfig.from_docker_env()
 #     bolt_port=7688,
 # )
 
-from graflo.util.onto import FilePattern
+from graflo.architecture.bindings import FileConnector
 import pathlib
 
-patterns = Patterns()
-patterns.add_file_pattern(
+bindings = Bindings()
+bindings.add_file_connector(
     "package",
-    FilePattern(regex=r"^package\.meta.*\.json(?:\.gz)?$", sub_path=pathlib.Path("./data"), resource_name="package")
+    FileConnector(regex=r"^package\.meta.*\.json(?:\.gz)?$", sub_path=pathlib.Path("./data"), resource_name="package")
 )
-patterns.add_file_pattern(
+bindings.add_file_connector(
     "bug",
-    FilePattern(regex=r"^bugs.*\.json(?:\.gz)?$", sub_path=pathlib.Path("./data"), resource_name="bug")
+    FileConnector(regex=r"^bugs.*\.json(?:\.gz)?$", sub_path=pathlib.Path("./data"), resource_name="bug")
 )
 
 from graflo.hq.caster import IngestionParams
 
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 
 ingestion_params = IngestionParams(
     clear_data=True,  # Clear existing data before ingesting
@@ -219,7 +222,7 @@ ingestion_params = IngestionParams(
 
 caster.ingest(
     target_db_config=conn_conf,  # Target database config
-    patterns=patterns,  # Source data patterns
+    bindings=bindings,  # Source data bindings
     ingestion_params=ingestion_params,
 )
 ```

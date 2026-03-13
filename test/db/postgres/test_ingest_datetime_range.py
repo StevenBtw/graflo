@@ -9,7 +9,7 @@ from graflo.filter.sql import datetime_range_where_sql
 from graflo.hq.caster import IngestionParams
 from graflo.hq.graph_engine import GraphEngine
 from graflo.onto import DBType
-from graflo.util.onto import TablePattern
+from graflo.architecture.bindings import TableConnector
 
 
 def _set_purchase_dates(postgres_conn):
@@ -31,11 +31,11 @@ def _set_purchase_dates(postgres_conn):
         postgres_conn.conn.commit()
 
 
-def test_datetime_columns_sets_date_field_on_patterns(conn_conf, load_mock_schema):
-    """create_patterns(..., datetime_columns=...) sets date_field on TablePatterns."""
+def test_datetime_columns_sets_date_field_on_connectors(conn_conf, load_mock_schema):
+    """create_bindings(..., datetime_columns=...) sets date_field on TableConnectors."""
     _ = load_mock_schema  # ensure tables exist
     engine = GraphEngine(target_db_flavor=DBType.ARANGO)
-    patterns = engine.create_patterns(
+    connectors = engine.create_bindings(
         conn_conf,
         schema_name="public",
         datetime_columns={
@@ -43,11 +43,11 @@ def test_datetime_columns_sets_date_field_on_patterns(conn_conf, load_mock_schem
             "users": "created_at",
         },
     )
-    assert patterns.table_patterns["purchases"].date_field == "purchase_date"
-    assert patterns.table_patterns["users"].date_field == "created_at"
+    assert connectors.table_connectors["purchases"].date_field == "purchase_date"
+    assert connectors.table_connectors["users"].date_field == "created_at"
     # Tables not in the map have no date_field
-    if "follows" in patterns.table_patterns:
-        assert patterns.table_patterns["follows"].date_field is None
+    if "follows" in connectors.table_connectors:
+        assert connectors.table_connectors["follows"].date_field is None
 
 
 def test_ingest_datetime_range_postgres(postgres_conn, load_mock_schema):
@@ -55,7 +55,7 @@ def test_ingest_datetime_range_postgres(postgres_conn, load_mock_schema):
     _ = load_mock_schema
     _set_purchase_dates(postgres_conn)
 
-    pattern = TablePattern(
+    pattern = TableConnector(
         table_name="purchases",
         schema_name="public",
         resource_name="purchases",
@@ -81,7 +81,7 @@ def test_ingest_datetime_range_with_global_column(postgres_conn, load_mock_schem
     _ = load_mock_schema
     _set_purchase_dates(postgres_conn)
 
-    pattern = TablePattern(
+    pattern = TableConnector(
         table_name="purchases",
         schema_name="public",
         resource_name="purchases",

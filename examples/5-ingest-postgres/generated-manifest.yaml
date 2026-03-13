@@ -1,0 +1,56 @@
+db_profile:
+    db_flavor: tigergraph
+    vertex_storage_names:
+        products: products
+        users: users
+graph:
+    edge_config:
+        edges:
+        -   relation: follows
+            source: users
+            target: users
+            weights:
+                direct:
+                -   name: created_at
+                    type: DATETIME
+        -   relation: purchases
+            source: users
+            target: products
+            weights:
+                direct:
+                -   name: purchase_date
+                    type: DATETIME
+                -   name: quantity
+                    type: INT
+                -   name: total_amount
+                    type: FLOAT
+    vertex_config:
+        vertices:
+        -   fields:
+            -   name: id
+                type: INT
+            -   name: name
+                type: STRING
+            -   name: price
+                type: FLOAT
+            -   name: description
+                type: STRING
+            -   name: created_at
+                type: DATETIME
+            identity:
+            -   id
+            name: products
+        -   fields:
+            -   name: id
+                type: INT
+            -   name: name
+                type: STRING
+            -   name: email
+                type: STRING
+            -   name: created_at
+                type: DATETIME
+            identity:
+            -   id
+            name: users
+metadata:
+    name: accounting

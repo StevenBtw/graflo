@@ -1,0 +1,36 @@
+import pytest
+
+from graflo.architecture.manifest import GraphManifest
+
+
+def _minimal_graph() -> dict:
+    return {
+        "vertex_config": {
+            "vertices": [{"name": "person", "fields": ["id"], "identity": ["id"]}]
+        },
+        "edge_config": {"edges": []},
+    }
+
+
+def test_manifest_requires_nested_schema_block():
+    cfg = {
+        "metadata": {"name": "kg"},
+        "graph": _minimal_graph(),
+    }
+    with pytest.raises(ValueError):
+        GraphManifest.from_config(cfg)
+
+
+def test_manifest_requires_at_least_one_block():
+    with pytest.raises(ValueError, match="GraphManifest requires at least one block"):
+        GraphManifest.from_config({})
+
+
+def test_manifest_accepts_nested_schema_and_ingestion():
+    cfg = {
+        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "ingestion_model": {"resources": []},
+    }
+    manifest = GraphManifest.from_config(cfg)
+    assert manifest.graph_schema is not None
+    assert manifest.ingestion_model is not None

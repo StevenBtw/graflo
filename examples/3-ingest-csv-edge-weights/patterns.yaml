@@ -1,4 +1,4 @@
-file_patterns:
+file_connectors:
     relations:
         __tag__: file
         regex: "^relations.*\\.csv$"

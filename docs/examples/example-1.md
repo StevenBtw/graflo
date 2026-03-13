@@ -76,10 +76,13 @@ Transforming the data and ingesting it into an ArangoDB takes a few lines of cod
 
 ```python
 from suthing import FileHandle
-from graflo import Caster, Patterns, Schema
+from graflo import Caster, Bindings, GraphManifest
 from graflo.db.connection.onto import ArangoConfig
 
-schema = Schema.from_dict(FileHandle.load("schema.yaml"))
+manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Option 1: Load config from docker/arango/.env (recommended)
 conn_conf = ArangoConfig.from_docker_env()
@@ -96,22 +99,22 @@ conn_conf = ArangoConfig.from_docker_env()
 #     database="mygraph",  # For ArangoDB, 'database' maps to schema/graph
 # )
 
-# Create Patterns with file patterns
-from graflo.util.onto import FilePattern
+# Create bindings with file connectors
+from graflo.architecture.bindings import FileConnector
 import pathlib
 
-patterns = Patterns()
-patterns.add_file_pattern(
+bindings = Bindings()
+bindings.add_file_connector(
     "people",
-    FilePattern(regex="^people.*\.csv$", sub_path=pathlib.Path("."), resource_name="people")
+    FileConnector(regex="^people.*\.csv$", sub_path=pathlib.Path("."), resource_name="people")
 )
-patterns.add_file_pattern(
+bindings.add_file_connector(
     "departments",
-    FilePattern(regex="^dep.*\.csv$", sub_path=pathlib.Path("."), resource_name="departments")
+    FileConnector(regex="^dep.*\.csv$", sub_path=pathlib.Path("."), resource_name="departments")
 )
 
 # Or use resource_mapping for simpler initialization
-# patterns = Patterns(
+# bindings = Bindings(
 #     _resource_mapping={
 #         "people": "./people.csv",
 #         "departments": "./departments.csv",
@@ -120,7 +123,7 @@ patterns.add_file_pattern(
 
 from graflo.hq.caster import IngestionParams
 
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 
 ingestion_params = IngestionParams(
     clear_data=True,  # Clear existing data before ingesting
@@ -129,7 +132,7 @@ ingestion_params = IngestionParams(
 
 caster.ingest(
     target_db_config=conn_conf,  # Target database config
-    patterns=patterns,  # Source data patterns
+    bindings=bindings,  # Source data bindings
     ingestion_params=ingestion_params,
 )
 

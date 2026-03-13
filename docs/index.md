@@ -2,7 +2,7 @@
 
 GraFlo is a **Graph Schema & Transformation Language (GSTL)** for Labeled Property Graphs (LPG).
 
-It provides a declarative, database-agnostic specification for mapping heterogeneous data sources — tabular (CSV, SQL), hierarchical (JSON, XML), and RDF/SPARQL — to a unified LPG representation. A `Resource` abstraction decouples transformation logic from data retrieval; `GraphContainer` is the covariant graph representation; and DB-specific behavior is resolved in DB-aware projection (`Schema.resolve_db_aware(...)`) and connector/writer stages. A `DataSourceRegistry` manages source adapters so that files, SQL tables, REST APIs, and SPARQL endpoints plug into the same pipeline. Supported targets: ArangoDB, Neo4j, TigerGraph, FalkorDB, Memgraph, NebulaGraph.
+It combines a database independent graph model, db-specific details and ingestion pipeline into a graph manifest and runs it across many systems. With declarative schemas and reusable `Resource` pipelines, GraFlo maps CSV/SQL, JSON/XML, RDF/SPARQL, REST APIs, and in-memory data into a single database-independent LPG model (`GraphContainer`), then projects it to supported graph databases: ArangoDB, Neo4j, TigerGraph, FalkorDB, Memgraph, and NebulaGraph.
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg) 
 [![PyPI version](https://badge.fury.io/py/graflo.svg)](https://badge.fury.io/py/graflo)
@@ -21,10 +21,10 @@ It provides a declarative, database-agnostic specification for mapping heterogen
 | Stage | Role | Code |
 |-------|------|------|
 | **Source Instance** | A concrete data artifact — a CSV file, a PostgreSQL table, a SPARQL endpoint, a `.ttl` file. | `AbstractDataSource` subclasses with a `DataSourceType` (`FILE`, `SQL`, `SPARQL`, `API`, `IN_MEMORY`). |
-| **Resource** | A reusable transformation pipeline — actor steps (descend, transform, vertex, edge, vertex_router, edge_router) that map raw records to graph elements. Data sources bind to Resources by name via the `DataSourceRegistry`. | `Resource` (part of `Schema`). |
-| **Graph Schema** | Declarative logical vertex/edge definitions, identities, typed fields, and named transforms. | `Schema`, `VertexConfig`, `EdgeConfig`. |
+| **Resource** | A reusable transformation pipeline — actor steps (descend, transform, vertex, edge, vertex_router, edge_router) that map raw records to graph elements. Data sources bind to Resources by name via the `DataSourceRegistry`. | `Resource` (part of `IngestionModel`). |
+| **Graph Schema** | Declarative logical vertex/edge definitions, identities, typed fields, and DB profile. | `Schema`, `VertexConfig`, `EdgeConfig`. |
 | **Covariant Graph Representation** | A database-independent collection of vertices and edges. | `GraphContainer`. |
-| **DB-aware Projection** | Resolves DB-specific naming/default/index behavior from logical schema + `DatabaseFeatures`. | `Schema.resolve_db_aware()`, `VertexConfigDBAware`, `EdgeConfigDBAware`. |
+| **DB-aware Projection** | Resolves DB-specific naming/default/index behavior from logical schema + `DatabaseProfile`. | `Schema.resolve_db_aware()`, `VertexConfigDBAware`, `EdgeConfigDBAware`. |
 | **Graph DB** | The target LPG store — same API for all supported databases. | `ConnectionManager`, `DBWriter`, DB connectors. |
 
 ## Core Concepts
@@ -65,7 +65,7 @@ The `DataSourceRegistry` manages `AbstractDataSource` adapters, each carrying a 
 
 ### GraphEngine
 
-`GraphEngine` orchestrates end-to-end operations: schema inference, schema definition in the target database, pattern creation from data sources, and data ingestion.
+`GraphEngine` orchestrates end-to-end operations: schema inference, schema definition in the target database, connector creation from data sources, and data ingestion.
 
 ## Key Features
 
@@ -75,6 +75,8 @@ The `DataSourceRegistry` manages `AbstractDataSource` adapters, each carrying a 
 - **DataSourceRegistry** — Register `FILE`, `SQL`, `API`, `IN_MEMORY`, or `SPARQL` data sources. Each `DataSourceType` plugs into the same Resource pipeline.
 - **SPARQL & RDF support** — Query SPARQL endpoints (e.g. Apache Fuseki), read `.ttl`/`.rdf`/`.n3` files, and auto-infer schemas from OWL/RDFS ontologies. Install with `pip install graflo[sparql]`.
 - **Schema inference** — Generate graph schemas from PostgreSQL 3NF databases (PK/FK heuristics) or from OWL/RDFS ontologies. See [Example 5](examples/example-5.md).
+- **Schema migration planning/execution** — Generate typed migration plans between schema versions, apply low-risk additive changes with risk gates, and track revision history via `migrate_schema`.
+  - Compare `from` and `to` schemas before execution to preview structural deltas and blocked high-risk operations.
 - **Typed fields** — Vertex fields and edge weights carry types for validation and database-specific optimisation.
 - **Parallel batch processing** — Configurable batch sizes and multi-core execution.
 - **Advanced filtering** — Server-side filtering (e.g. TigerGraph REST++ API), client-side filter expressions, and **SelectSpec** for declarative SQL view/filter control before data reaches Resources.
@@ -85,6 +87,8 @@ The `DataSourceRegistry` manages `AbstractDataSource` adapters, each carrying a 
 - [Installation](getting_started/installation.md)
 - [Quick Start Guide](getting_started/quickstart.md)
 - [Concepts (architecture diagrams)](concepts/index.md)
+- [Concepts — Schema Migration](concepts/index.md#schema-migration-v1)
+- [Concepts — Comparing Two Schemas](concepts/index.md#comparing-two-schemas)
 - [API Reference](reference/index.md)
 - [Examples](examples/index.md)
 

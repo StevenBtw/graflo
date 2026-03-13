@@ -5,12 +5,13 @@ This guide will help you get started with graflo by showing you how to transform
 ## Basic Concepts
 
 - graflo uses `Caster` class to cast data into a property graph representation and eventually graph database. 
-- Class `Schema` encodes the representation of vertices, and edges (relations), the transformations the original data undergoes to become a graph and how data sources are mapped onto graph definition.
+- Class `Schema` encodes the logical graph representation (vertices, edges, identities, DB profile).
+- Class `IngestionModel` defines resources/transforms and how records are mapped into graph entities.
 - `Resource` class defines how data is transformed into a graph (semantic mapping).
 - `DataSource` defines where data comes from (files, APIs, SQL databases, in-memory objects).
-- Class `Patterns` manages the mapping of resources to their physical data sources (files or PostgreSQL tables). It efficiently handles PostgreSQL connections by grouping tables that share the same connection configuration. 
+- `Bindings` manages the mapping of resources to their physical data sources (files or PostgreSQL tables). 
 - `DataSourceRegistry` maps DataSources to Resources (many DataSources can map to the same Resource).
-- Database backend configurations use Pydantic `BaseSettings` with environment variable support. Use `ArangoConfig`, `Neo4jConfig`, `TigergraphConfig`, `FalkordbConfig`, `MemgraphConfig`, `NebulaConfig`, or `PostgresConfig` directly, or load from docker `.env` files using `from_docker_env()`. All configs inherit from `DBConfig` and support unified `database`/`schema_name` structure with `effective_database` and `effective_schema` properties for database-agnostic access. If `effective_schema` is not set, `GraphEngine.define_schema()` automatically uses `Schema.general.name` as fallback.
+- Database backend configurations use Pydantic `BaseSettings` with environment variable support. Use `ArangoConfig`, `Neo4jConfig`, `TigergraphConfig`, `FalkordbConfig`, `MemgraphConfig`, `NebulaConfig`, or `PostgresConfig` directly, or load from docker `.env` files using `from_docker_env()`. All configs inherit from `DBConfig` and support unified `database`/`schema_name` structure with `effective_database` and `effective_schema` properties for database-agnostic access. If `effective_schema` is not set, `GraphEngine.define_schema()` automatically uses `schema.metadata.name` as fallback.
 
 ## Basic Example
 
@@ -19,13 +20,16 @@ Here's a simple example of transforming CSV files of two types, `people` and `de
 ```python
 import pathlib
 from suthing import FileHandle
-from graflo import Caster, Patterns, Schema
-from graflo.util.onto import FilePattern
+from graflo import Bindings, Caster, GraphManifest
+from graflo.architecture.bindings import FileConnector
 from graflo.db.connection.onto import ArangoConfig
 
-schema = Schema.from_dict(FileHandle.load("schema.yaml"))
+manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 
 # Option 1: Load config from docker/arango/.env (recommended)
 conn_conf = ArangoConfig.from_docker_env()
@@ -54,24 +58,22 @@ user_conn_conf = ArangoConfig.from_env(prefix="USER")
 #     database="mygraph",  # For ArangoDB, 'database' maps to schema/graph
 # )
 
-# Create Patterns with file patterns
-# FilePattern includes the path (sub_path) where files are located
-from graflo.util.onto import FilePattern
-
-patterns = Patterns()
-patterns.add_file_pattern(
+# Create bindings with file connectors
+# FileConnector includes the path (sub_path) where files are located
+bindings = Bindings()
+bindings.add_file_connector(
     "people",
-    FilePattern(regex="^people.*\.csv$", sub_path=pathlib.Path("."), resource_name="people")
+    FileConnector(regex="^people.*\.csv$", sub_path=pathlib.Path("."), resource_name="people")
 )
-patterns.add_file_pattern(
+bindings.add_file_connector(
     "departments",
-    FilePattern(regex="^dep.*\.csv$", sub_path=pathlib.Path("."), resource_name="departments")
+    FileConnector(regex="^dep.*\.csv$", sub_path=pathlib.Path("."), resource_name="departments")
 )
 
 # Or use resource_mapping for simpler initialization
-patterns = Patterns(
+bindings = Bindings(
     _resource_mapping={
-        "people": "./people.csv",  # File path - creates FilePattern automatically
+        "people": "./people.csv",  # File path - creates FileConnector automatically
         "departments": "./departments.csv",
     }
 )
@@ -82,38 +84,41 @@ from graflo.hq import GraphEngine
 # Option 1: Use GraphEngine for schema definition and ingestion (recommended)
 engine = GraphEngine()
 ingestion_params = IngestionParams(
-    recreate_schema=False,  # Set to True to drop and redefine schema (script halts if schema exists)
+    clear_data=False,
 )
 
+# Attach bindings to the manifest before orchestration.
+ingest_manifest = manifest.model_copy(update={"bindings": bindings})
+ingest_manifest.finish_init()
+
 engine.define_and_ingest(
-    schema=schema,
+    manifest=ingest_manifest,
     target_db_config=conn_conf,  # Target database config
-    patterns=patterns,  # Source data patterns
     ingestion_params=ingestion_params,
     recreate_schema=False,  # Set to True to drop and redefine schema (script halts if schema exists)
 )
 
 # Option 2: Use Caster directly (schema must be defined separately)
 # engine = GraphEngine()
-# engine.define_schema(schema=schema, target_db_config=conn_conf, recreate_schema=False)
+# engine.define_schema(manifest=manifest, target_db_config=conn_conf, recreate_schema=False)
 # 
-# caster = Caster(schema)
+# caster = Caster(schema=schema, ingestion_model=ingestion_model)
 # caster.ingest(
 #     target_db_config=conn_conf,
-#     patterns=patterns,
+#     bindings=bindings,
 #     ingestion_params=ingestion_params,
 # )
 ```
 
-Here `schema` defines the graph and the mapping of sources to vertices and edges. See [Creating a Schema](creating_schema.md) for how to define `vertex_config`, `edge_config`, and **resources**; see [Concepts — Schema](../concepts/index.md#schema) for a high-level overview.
+Here `schema` defines the logical graph, while `ingestion_model` defines resources/transforms and `bindings` maps resources to physical data sources. See [Creating a Manifest](creating_manifest.md) and [Concepts — Schema](../concepts/index.md#schema) for details.
 
-The `Patterns` class maps resource names (from `Schema`) to their physical data sources:
-- **FilePattern**: For file-based resources with `regex` for matching filenames and `sub_path` for the directory to search
-- **TablePattern**: For PostgreSQL table resources with connection configuration
+`Bindings` maps resource names (from `IngestionModel`) to their physical data sources:
+- **FileConnector**: For file-based resources with `regex` for matching filenames and `sub_path` for the directory to search
+- **TableConnector**: For PostgreSQL table resources with connection configuration
 
 The `ingest()` method takes:
 - `target_db_config`: Target graph database configuration (where to write the graph)
-- `patterns`: Source data patterns (where to read data from - files or database tables)
+- `bindings`: Source data connectors (where to read data from - files or database tables)
 
 ## 🚀 Using PostgreSQL Tables as Data Sources
 
@@ -133,16 +138,16 @@ pg_config = PostgresConfig.from_docker_env()  # Or from_env(), or create directl
 # Create GraphEngine and infer schema from PostgreSQL (automatically detects vertices and edges)
 # Connection is automatically managed inside infer_schema()
 engine = GraphEngine()
-schema = engine.infer_schema(pg_config, schema_name="public")
+manifest = engine.infer_manifest(pg_config, schema_name="public")
 
-# Create patterns from PostgreSQL tables
+# Create bindings from PostgreSQL tables
 engine = GraphEngine()
-patterns = engine.create_patterns(pg_config, schema_name="public")
+bindings = engine.create_bindings(pg_config, schema_name="public")
 
-# Or create patterns manually
-from graflo.util.onto import Patterns, TablePattern
+# Or create bindings manually
+from graflo.architecture.bindings import Bindings, TableConnector
 
-patterns = Patterns(
+bindings = Bindings(
     _resource_mapping={
         "users": ("db1", "users"),  # (config_key, table_name) tuple
         "products": ("db1", "products"),
@@ -161,15 +166,17 @@ arango_config = ArangoConfig.from_docker_env()  # Target graph database
 # Use GraphEngine for schema definition and ingestion
 engine = GraphEngine()
 ingestion_params = IngestionParams(
-    recreate_schema=False,  # Set to True to drop and redefine schema (script halts if schema exists)
+    clear_data=False,
     # Optional: restrict to a date range with datetime_after, datetime_before, datetime_column
-    # (use with create_patterns(..., datetime_columns={...}) for per-table columns)
+    # (use with create_bindings(..., datetime_columns={...}) for per-table columns)
 )
 
+ingest_manifest = manifest.model_copy(update={"bindings": bindings})
+ingest_manifest.finish_init()
+
 engine.define_and_ingest(
-    schema=schema,
+    manifest=ingest_manifest,
     target_db_config=arango_config,  # Target graph database
-    patterns=patterns,  # Source PostgreSQL tables
     ingestion_params=ingestion_params,
     recreate_schema=False,  # Set to True to drop and redefine schema (script halts if schema exists)
 )
@@ -180,10 +187,13 @@ engine.define_and_ingest(
 You can also ingest data from REST API endpoints:
 
 ```python
-from graflo import Caster, DataSourceRegistry, Schema
+from graflo import Caster, DataSourceRegistry, GraphManifest
 from graflo.data_source import DataSourceFactory, APIConfig, PaginationConfig
 
-schema = Schema.from_dict(FileHandle.load("schema.yaml"))
+manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Create API data source
 api_config = APIConfig(
@@ -212,19 +222,23 @@ from graflo.hq import GraphEngine
 # Define schema first (required before ingestion)
 engine = GraphEngine()
 engine.define_schema(
-    schema=schema,
+    manifest=manifest,
     target_db_config=conn_conf,
     recreate_schema=False,
 )
 
 # Then ingest using Caster
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 ingestion_params = IngestionParams()  # Use default parameters
 
-caster.ingest_data_sources(
-    data_source_registry=registry,
-    conn_conf=conn_conf,  # Target database config
-    ingestion_params=ingestion_params,
+import asyncio
+
+asyncio.run(
+    caster.ingest_data_sources(
+        data_source_registry=registry,
+        conn_conf=conn_conf,  # Target database config
+        ingestion_params=ingestion_params,
+    )
 )
 ```
 
@@ -254,7 +268,7 @@ Then use it with the CLI:
 ```bash
 uv run ingest \
     --db-config-path config/db.yaml \
-    --schema-path config/schema.yaml \
+    --schema-path config/manifest.yaml \
     --data-source-config-path data_sources.yaml
 ```
 

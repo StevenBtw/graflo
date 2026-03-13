@@ -2,7 +2,7 @@
 
 This example demonstrates:
 - Inferring a Schema from PostgreSQL database structure
-- Creating Patterns from PostgreSQL tables
+- Creating Bindings from PostgreSQL tables
 - Ingesting data from PostgreSQL into a graph database (ArangoDB/Neo4j)
 
 Prerequisites:
@@ -80,11 +80,11 @@ else:
     logger.warning(f"Mock schema file not found: {schema_file}")
     logger.warning("Assuming PostgreSQL database is already initialized")
 
-# Step 3: Create GraphEngine to orchestrate schema inference, pattern creation, and ingestion
-# GraphEngine coordinates all operations: schema inference, pattern mapping, schema definition, and data ingestion
+# Step 3: Create GraphEngine to orchestrate schema inference, connector creation, and ingestion
+# GraphEngine coordinates all operations: schema inference, connector mapping, schema definition, and data ingestion
 engine = GraphEngine(target_db_flavor=db_type)
 
-# Step 3.1: Infer Schema from PostgreSQL database structure
+# Step 3.1: Infer manifest from PostgreSQL database structure
 # This automatically detects vertex-like and edge-like tables based on:
 # - Vertex tables: Have a primary key and descriptive columns
 # - Edge tables: Have 2+ foreign keys (representing relationships)
@@ -93,19 +93,22 @@ engine = GraphEngine(target_db_flavor=db_type)
 # - Higher values (e.g., 0.9) = stricter matching, fewer matches
 # - Lower values (e.g., 0.7) = more lenient matching, more matches
 # Default is 0.8
-schema = engine.infer_schema(postgres_conf, schema_name="public", fuzzy_threshold=0.8)
-
-schema.general.name = "accounting"
+manifest = engine.infer_manifest(
+    postgres_conf, schema_name="public", fuzzy_threshold=0.8
+)
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
+schema.metadata.name = "accounting"
 # Step 3.5: Dump inferred schema to YAML file
-schema_output_file = Path(__file__).parent / "generated-schema.yaml"
+schema_output_file = Path(__file__).parent / "generated-manifest.yaml"
 
 FileHandle.dump(schema.model_dump(exclude_defaults=True), schema_output_file)
 
 logger.info(f"Inferred schema saved to {schema_output_file}")
 
-# Step 4: Create Patterns from PostgreSQL tables
-# This maps PostgreSQL tables to resource patterns that Caster can use
-# Connection is automatically managed inside create_patterns()
+# Step 4: Create Bindings from PostgreSQL tables
+# This maps PostgreSQL tables to resource connectors that Caster can use
+# Connection is automatically managed inside create_bindings()
 #
 # Optional: provide a datetime column per resource for date-range filtering.
 # Use with IngestionParams(datetime_after=..., datetime_before=...) to ingest
@@ -116,11 +119,13 @@ datetime_columns = {
     "products": "created_at",
     "follows": "created_at",
 }
-patterns = engine.create_patterns(
+bindings = engine.create_bindings(
     postgres_conf,
     schema_name="public",
     datetime_columns=datetime_columns,
 )
+manifest = manifest.model_copy(update={"bindings": bindings})
+manifest.finish_init()
 
 # Step 4.5 & 5: Define schema and ingest data in one operation
 # This creates/initializes the database schema and then ingests data
@@ -133,12 +138,11 @@ patterns = engine.create_patterns(
 #     clear_data=True,
 #     datetime_after="2020-01-01",
 #     datetime_before="2021-01-01",
-#     datetime_column="created_at",  # default if a pattern has no date_field
+#     datetime_column="created_at",  # default if a connector has no date_field
 # )
 engine.define_and_ingest(
-    schema=schema,
+    manifest=manifest,
     target_db_config=conn_conf,
-    patterns=patterns,
     ingestion_params=IngestionParams(clear_data=True),
     recreate_schema=True,
 )
@@ -146,10 +150,10 @@ engine.define_and_ingest(
 print("\n" + "=" * 80)
 print("Ingestion complete!")
 print("=" * 80)
-print(f"\nSchema: {schema.general.name}")
-print(f"Vertices: {len(schema.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.edge_config.edges_list()))}")
-print(f"Resources: {len(schema.resources)}")
+print(f"\nSchema: {schema.metadata.name}")
+print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
+print(f"Edges: {len(list(schema.graph.edge_config.edges_list()))}")
+print(f"Resources: {len(ingestion_model.resources)}")
 print("=" * 80)
 
 # View the ingested data in your graph database's web interface:

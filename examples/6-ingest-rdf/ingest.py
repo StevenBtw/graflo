@@ -2,7 +2,7 @@
 
 This example demonstrates:
 - Inferring a Schema from an OWL ontology (TBox)
-- Creating Patterns with explicit SparqlPattern resource mapping
+- Creating Bindings with explicit SparqlConnector resource mapping
 - Ingesting RDF instance data (ABox) into a graph database (ArangoDB/Neo4j)
 
 The dataset models a small academic knowledge graph with Researchers,
@@ -20,7 +20,8 @@ from pathlib import Path
 
 from graflo.db import ArangoConfig
 from graflo.hq import GraphEngine, IngestionParams
-from graflo.util.onto import Patterns, SparqlPattern
+from graflo.architecture.bindings import Bindings, SparqlConnector
+from graflo.architecture.manifest import GraphManifest
 from suthing import FileHandle
 
 
@@ -68,62 +69,62 @@ db_type = conn_conf.connection_type
 # owl:ObjectProperty) and builds vertices, fields, and edges automatically.
 engine = GraphEngine(target_db_flavor=db_type)
 
-schema = engine.infer_schema_from_rdf(
+schema, ingestion_model = engine.infer_schema_from_rdf(
     source=ONTOLOGY_FILE,
     schema_name="academic_kg",
 )
 
 
-schema_output_file = Path(__file__).parent / "generated-schema.yaml"
+schema_output_file = Path(__file__).parent / "generated-manifest.yaml"
 
 FileHandle.dump(schema.model_dump(exclude_defaults=True), schema_output_file)
 
 
 logger.info(
     "Inferred schema: %d vertices, %d edges",
-    len(schema.vertex_config.vertices),
-    len(list(schema.edge_config.edges_list())),
+    len(schema.graph.vertex_config.vertices),
+    len(list(schema.graph.edge_config.edges_list())),
 )
 
 # ---------------------------------------------------------------------------
-# Step 3: Build Patterns with EXPLICIT resource mapping
+# Step 3: Build Bindings with EXPLICIT resource mapping
 # ---------------------------------------------------------------------------
-# Instead of engine.create_patterns_from_rdf() we construct each
-# SparqlPattern by hand, pointing at the local data file and specifying
+# Instead of engine.create_bindings_from_rdf() we construct each
+# SparqlConnector by hand, pointing at the local data file and specifying
 # the rdf:Class URI that each resource should fetch.
-patterns = Patterns()
+bindings = Bindings()
 
-patterns.add_sparql_pattern(
+bindings.add_sparql_connector(
     "Researcher",
-    SparqlPattern(
+    SparqlConnector(
         rdf_class="http://example.org/Researcher",
         rdf_file=DATA_FILE,
         resource_name="Researcher",
     ),
 )
 
-patterns.add_sparql_pattern(
+bindings.add_sparql_connector(
     "Publication",
-    SparqlPattern(
+    SparqlConnector(
         rdf_class="http://example.org/Publication",
         rdf_file=DATA_FILE,
         resource_name="Publication",
     ),
 )
 
-patterns.add_sparql_pattern(
+bindings.add_sparql_connector(
     "Institution",
-    SparqlPattern(
+    SparqlConnector(
         rdf_class="http://example.org/Institution",
         rdf_file=DATA_FILE,
         resource_name="Institution",
     ),
 )
 
-# Alternative: point patterns at a remote SPARQL endpoint instead of a file
-# patterns.add_sparql_pattern(
+# Alternative: point connectors at a remote SPARQL endpoint instead of a file
+# bindings.add_sparql_connector(
 #     "Researcher",
-#     SparqlPattern(
+#     SparqlConnector(
 #         rdf_class="http://example.org/Researcher",
 #         endpoint_url="http://localhost:3030/dataset/sparql",
 #         resource_name="Researcher",
@@ -134,9 +135,12 @@ patterns.add_sparql_pattern(
 # Step 4: Define schema and ingest in one operation
 # ---------------------------------------------------------------------------
 engine.define_and_ingest(
-    schema=schema,
+    manifest=GraphManifest(
+        graph_schema=schema,
+        ingestion_model=ingestion_model,
+        bindings=bindings,
+    ),
     target_db_config=conn_conf,
-    patterns=patterns,
     ingestion_params=IngestionParams(clear_data=True),
     recreate_schema=True,
 )
@@ -144,10 +148,10 @@ engine.define_and_ingest(
 print("\n" + "=" * 80)
 print("Ingestion complete!")
 print("=" * 80)
-print(f"\nSchema: {schema.general.name}")
-print(f"Vertices: {len(schema.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.edge_config.edges_list()))}")
-print(f"Resources: {len(schema.resources)}")
+print(f"\nSchema: {schema.metadata.name}")
+print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
+print(f"Edges: {len(list(schema.graph.edge_config.edges_list()))}")
+print(f"Resources: {len(ingestion_model.resources)}")
 print("=" * 80)
 
 # View the ingested data in your graph database's web interface:

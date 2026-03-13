@@ -14,13 +14,13 @@ from pydantic import Field
 from graflo.architecture.base import ConfigBaseModel
 from graflo.filter.onto import FilterExpression
 from graflo.onto import ExpressionFlavor
-from graflo.util.onto import JoinClause
+from graflo.architecture.bindings import JoinClause
 
 
 class SelectSpec(ConfigBaseModel):
     """Declarative view specification emulating SQL SELECT structure.
 
-    Alternative to TablePattern's table_name + joins + filters.
+    Alternative to TableConnector's table_name + joins + filters.
     Supports from_dict() for YAML/JSON loading (like FilterExpression).
 
     Attributes:
@@ -62,7 +62,7 @@ class SelectSpec(ConfigBaseModel):
 
         Args:
             schema: Schema name (e.g. "public")
-            base_table: Base table name (from TablePattern.table_name)
+            base_table: Base table name (from TableConnector.table_name)
 
         Returns:
             Complete SQL query string

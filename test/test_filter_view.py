@@ -1,4 +1,4 @@
-"""Tests for SelectSpec and TablePattern view (type_lookup)."""
+"""Tests for SelectSpec and TableConnector view (type_lookup)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 from graflo.data_source.sql import SQLConfig, SQLDataSource
 from graflo.filter.view import SelectSpec
-from graflo.util.onto import TablePattern
+from graflo.architecture.bindings import TableConnector
 
 
 def _setup_test_db() -> str:
@@ -159,12 +159,12 @@ class TestSelectSpecTypeLookup:
         assert rows[0]["relation"] == "contains"
 
 
-class TestTablePatternWithView:
-    """TablePattern with view=SelectSpec."""
+class TestTableConnectorWithView:
+    """TableConnector with view=SelectSpec."""
 
-    def test_table_pattern_build_query_uses_view(self):
-        """TablePattern.build_query when view is set delegates to view.build_sql."""
-        pattern = TablePattern(
+    def test_table_connector_build_query_uses_view(self):
+        """TableConnector.build_query when view is set delegates to view.build_sql."""
+        connector = TableConnector(
             table_name="entity_links",
             schema_name="public",
             view={
@@ -177,7 +177,7 @@ class TestTablePatternWithView:
                 "relation": "link_type",
             },
         )
-        sql = pattern.build_query("public")
+        sql = connector.build_query("public")
 
         assert "source_id" in sql
         assert "source_type" in sql
@@ -186,10 +186,10 @@ class TestTablePatternWithView:
         assert "entity_links" in sql
         assert "entity_types" in sql
 
-    def test_table_pattern_view_executes_on_sqlite(self):
-        """TablePattern with view produces executable SQL on SQLite."""
+    def test_table_connector_view_executes_on_sqlite(self):
+        """TableConnector with view produces executable SQL on SQLite."""
         conn_str = _setup_test_db()
-        pattern = TablePattern(
+        connector = TableConnector(
             table_name="entity_links",
             schema_name="main",
             view={
@@ -202,7 +202,7 @@ class TestTablePatternWithView:
                 "relation": "link_type",
             },
         )
-        sql = pattern.build_query("main")
+        sql = connector.build_query("main")
         sql_sqlite = sql.replace('"main".', "").replace("main.", "")
 
         ds = SQLDataSource(
@@ -219,11 +219,11 @@ class TestTablePatternWithView:
         assert rows[0]["target_type"] == "task"
 
 
-class TestCreatePatternsTypeLookup:
-    """create_patterns_from_postgres with type_lookup_overrides."""
+class TestCreateBindingsTypeLookup:
+    """create_bindings_from_postgres with type_lookup_overrides."""
 
-    def test_type_lookup_overrides_sets_view_on_pattern(self):
-        """type_lookup_overrides sets view on matching edge table patterns."""
+    def test_type_lookup_overrides_sets_view_on_connector(self):
+        """type_lookup_overrides sets view on matching edge table connectors."""
         from graflo.db import PostgresConnection
         from graflo.hq.resource_mapper import ResourceMapper
 
@@ -239,7 +239,7 @@ class TestCreatePatternsTypeLookup:
         mock_conn.config = MagicMock()
 
         mapper = ResourceMapper()
-        patterns = mapper.create_patterns_from_postgres(
+        bindings = mapper.create_bindings_from_postgres(
             conn=mock_conn,
             schema_name="public",
             type_lookup_overrides={
@@ -254,7 +254,7 @@ class TestCreatePatternsTypeLookup:
             },
         )
 
-        tp = patterns.table_patterns["entity_links"]
+        tp = bindings.table_connectors["entity_links"]
         assert tp.view is not None
         assert tp.view.kind == "type_lookup"
         assert tp.view.table == "entity_types"

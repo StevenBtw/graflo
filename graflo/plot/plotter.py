@@ -11,7 +11,7 @@ Key Components:
     - Tree assembly and graph generation utilities
 
 Example:
-    >>> plotter = SchemaPlotter("config.json", "output/")
+    >>> plotter = ManifestPlotter("config.json", "output/")
     >>> plotter.plot_vc2fields()  # Plot vertex collections and their fields
     >>> plotter.plot_resources()  # Plot resource relationships
     >>> plotter.plot_vc2vc()      # Plot vertex collection relationships
@@ -25,17 +25,30 @@ from pathlib import Path
 import networkx as nx
 from suthing import FileHandle
 
-from graflo.architecture import Schema
+from graflo.architecture import GraphManifest
 from graflo.architecture.actor import (
     ActorWrapper,
     DescendActor,
     EdgeActor,
+    EdgeRouterActor,
     TransformActor,
     VertexActor,
+    VertexRouterActor,
 )
 from graflo.onto import BaseEnum
 
 logger = logging.getLogger(__name__)
+
+partition_color_palette = [
+    "#BEDFC8",
+    "#B7D1DF",
+    "#DDD0E5",
+    "#FFE5B4",
+    "#EBA59E",
+    "#E4E1D7",
+    "#C7CEEA",
+    "#D5E8D4",
+]
 
 
 class AuxNodeType(BaseEnum):
@@ -203,7 +216,12 @@ def lto_dict(strings):
     return r
 
 
-def assemble_tree(aw: ActorWrapper, fig_path: Path | str | None = None):
+def assemble_tree(
+    aw: ActorWrapper,
+    fig_path: Path | str | None = None,
+    output_format: str = "pdf",
+    output_dpi: int | None = None,
+):
     """Assemble a tree visualization from an actor wrapper.
 
     Args:
@@ -236,9 +254,11 @@ def assemble_tree(aw: ActorWrapper, fig_path: Path | str | None = None):
 
     if fig_path is not None:
         ag = nx.nx_agraph.to_agraph(g)
+        if output_format == "png" and output_dpi is not None:
+            ag.graph_attr["dpi"] = str(output_dpi)
         ag.draw(
             fig_path,
-            "pdf",
+            output_format,
             prog="dot",
         )
         return None
@@ -246,7 +266,7 @@ def assemble_tree(aw: ActorWrapper, fig_path: Path | str | None = None):
         return g
 
 
-class SchemaPlotter:
+class ManifestPlotter:
     """Main class for schema visualization.
 
     This class provides methods to visualize different aspects of a graph database
@@ -260,7 +280,13 @@ class SchemaPlotter:
         prefix: Prefix for output files
     """
 
-    def __init__(self, config_filename, fig_path):
+    def __init__(
+        self,
+        config_filename,
+        fig_path,
+        output_format: str = "pdf",
+        output_dpi: int | None = None,
+    ):
         """Initialize the schema plotter.
 
         Args:
@@ -268,13 +294,29 @@ class SchemaPlotter:
             fig_path: Path to save visualizations
         """
         self.fig_path = fig_path
+        self.output_format = output_format.lower()
+        self.output_dpi = output_dpi
 
         self.config = FileHandle.load(fpath=config_filename)
+        manifest = GraphManifest.from_config(self.config)
+        manifest.finish_init()
+        self.schema = manifest.require_schema()
+        self.ingestion_model = manifest.require_ingestion_model()
 
-        self.schema = Schema.from_dict(self.config)
-
-        self.name = self.schema.general.name
+        self.name = self.schema.metadata.name
         self.prefix = self.name
+
+    def _figure_path(self, stem: str) -> str:
+        return os.path.join(self.fig_path, f"{stem}.{self.output_format}")
+
+    def _draw(self, ag, stem: str, prog: str = "dot") -> None:
+        if self.output_format == "png" and self.output_dpi is not None:
+            ag.graph_attr["dpi"] = str(self.output_dpi)
+        ag.draw(
+            self._figure_path(stem),
+            self.output_format,
+            prog=prog,
+        )
 
     def _discover_edges_from_resources(self):
         """Discover edges from resources by walking through ActorWrappers.
@@ -288,7 +330,7 @@ class SchemaPlotter:
         """
         discovered_edges = {}
 
-        for resource in self.schema.resources:
+        for resource in self.ingestion_model.resources:
             # Collect all actors from the resource's ActorWrapper
             actors = resource.root.collect_actors()
 
@@ -303,6 +345,49 @@ class SchemaPlotter:
 
         return discovered_edges
 
+    @staticmethod
+    def _node_id_to_vertex(node_id: str) -> str:
+        """Extract vertex name from an AuxNodeType.VERTEX node ID."""
+        return node_id.split(":", maxsplit=1)[1]
+
+    def _build_partition_color_map(
+        self,
+        partition_values: set[str],
+        partition_colors: dict[str, str] | None,
+    ) -> dict[str, str]:
+        """Build a deterministic color map for partition labels."""
+        color_map = {}
+        if partition_colors is not None:
+            color_map.update(partition_colors)
+
+        auto_keys = sorted(partition_values - set(color_map.keys()))
+        for idx, key in enumerate(auto_keys):
+            color_map[key] = partition_color_palette[idx % len(partition_color_palette)]
+        return color_map
+
+    def _infer_vertex_levels(self, edges: list[tuple[str, str]]) -> dict[str, int]:
+        """Infer robust DAG-like levels by collapsing SCCs then layering the DAG."""
+        graph = nx.DiGraph()
+        graph.add_nodes_from(self.schema.graph.vertex_config.vertex_set)
+        graph.add_edges_from(edges)
+
+        condensation = nx.condensation(graph)
+        component_level: dict[int, int] = {}
+        for component in nx.topological_sort(condensation):
+            predecessors = list(condensation.predecessors(component))
+            if not predecessors:
+                component_level[component] = 0
+                continue
+            component_level[component] = (
+                max(component_level[pred] for pred in predecessors) + 1
+            )
+
+        levels = {}
+        member_map = condensation.graph["mapping"]
+        for vertex in graph.nodes:
+            levels[vertex] = component_level[member_map[vertex]]
+        return levels
+
     def plot_vc2fields(self):
         """Plot vertex collections and their fields.
 
@@ -313,8 +398,10 @@ class SchemaPlotter:
         g = nx.DiGraph()
         nodes = []
         edges = []
-        vconf = self.schema.vertex_config
-        vertex_prefix_dict = lto_dict([v for v in self.schema.vertex_config.vertex_set])
+        vconf = self.schema.graph.vertex_config
+        vertex_prefix_dict = lto_dict(
+            [v for v in self.schema.graph.vertex_config.vertex_set]
+        )
 
         kwargs = {"vfield": True, "vertex_sh": vertex_prefix_dict}
         for k in vconf.vertex_set:
@@ -392,11 +479,7 @@ class SchemaPlotter:
             index_subgraph.node_attr["label"] = "definition"
 
         ag = ag.unflatten("-l 5 -f -c 3")
-        ag.draw(
-            os.path.join(self.fig_path, f"{self.prefix}_vc2fields.pdf"),
-            "pdf",
-            prog="dot",
-        )
+        self._draw(ag, f"{self.prefix}_vc2fields")
 
     def plot_resources(self):
         """Plot resource relationships.
@@ -406,19 +489,22 @@ class SchemaPlotter:
         separate PDF file.
         """
         resource_prefix_dict = lto_dict(
-            [resource.name for resource in self.schema.resources]
+            [resource.name for resource in self.ingestion_model.resources]
         )
-        vertex_prefix_dict = lto_dict([v for v in self.schema.vertex_config.vertex_set])
+        vertex_prefix_dict = lto_dict(
+            [v for v in self.schema.graph.vertex_config.vertex_set]
+        )
         kwargs = {"vertex_sh": vertex_prefix_dict, "resource_sh": resource_prefix_dict}
 
-        for resource in self.schema.resources:
+        for resource in self.ingestion_model.resources:
             kwargs["resource"] = resource.name
             assemble_tree(
                 resource.root,
-                os.path.join(
-                    self.fig_path,
-                    f"{self.schema.general.name}.resource-{resource.resource_name}.pdf",
+                self._figure_path(
+                    f"{self.schema.metadata.name}.resource-{resource.resource_name}"
                 ),
+                output_format=self.output_format,
+                output_dpi=self.output_dpi,
             )
 
     def plot_source2vc(self):
@@ -427,53 +513,33 @@ class SchemaPlotter:
         Creates a visualization showing the relationship between source resources
         and vertex collections. The visualization is saved as a PDF file.
         """
-        nodes = []
         g = nx.MultiDiGraph()
-        edges = []
-        resource_prefix_dict = lto_dict(
-            [resource.name for resource in self.schema.resources]
-        )
-        vertex_prefix_dict = lto_dict([v for v in self.schema.vertex_config.vertex_set])
-        kwargs = {"vertex_sh": vertex_prefix_dict, "resource_sh": resource_prefix_dict}
+        vertex_set = set(self.schema.graph.vertex_config.vertex_set)
 
-        for resource in self.schema.resources:
-            kwargs["resource"] = resource.name
+        for resource in self.ingestion_model.resources:
+            resource_id = get_auxnode_id(
+                AuxNodeType.RESOURCE,
+                resource=resource.name,
+                resource_type="resource",
+            )
+            g.add_node(
+                resource_id,
+                type=AuxNodeType.RESOURCE,
+                label=resource.name,
+            )
 
-            g = assemble_tree(resource.root)
-
-            vertices = []
-            nodes_resource = [
-                (
-                    get_auxnode_id(AuxNodeType.RESOURCE, **kwargs),
-                    {
-                        "type": AuxNodeType.RESOURCE,
-                        "label": get_auxnode_id(
-                            AuxNodeType.RESOURCE, label=True, **kwargs
-                        ),
-                    },
+            vertex_reasons = self._extract_resource_vertex_reasons(resource)
+            for vertex_name, reasons in sorted(vertex_reasons.items()):
+                if vertex_name not in vertex_set:
+                    continue
+                vertex_id = get_auxnode_id(AuxNodeType.VERTEX, vertex=vertex_name)
+                g.add_node(
+                    vertex_id,
+                    type=AuxNodeType.VERTEX,
+                    label=vertex_name,
                 )
-            ]
-            nodes_vertex = [
-                (
-                    get_auxnode_id(AuxNodeType.VERTEX, vertex=v, **kwargs),
-                    {
-                        "type": AuxNodeType.VERTEX,
-                        "label": get_auxnode_id(
-                            AuxNodeType.VERTEX, vertex=v, label=True, **kwargs
-                        ),
-                    },
-                )
-                for v in vertices
-            ]
-            nodes += nodes_resource
-            nodes += nodes_vertex
-            edges += [
-                (nt[0], nc[0]) for nt, nc in product(nodes_resource, nodes_vertex)
-            ]
-
-        g.add_nodes_from(nodes)
-
-        g.add_edges_from(edges)
+                edge_label = ", ".join(sorted(reasons))
+                g.add_edge(resource_id, vertex_id, label=edge_label)
 
         for n in g.nodes():
             props = g.nodes()[n]
@@ -484,19 +550,135 @@ class SchemaPlotter:
             }
             if "label" in props:
                 upd_dict["forcelabel"] = True
-            if "name" in props:
-                upd_dict["label"] = props["name"]
-            for resource, v in upd_dict.items():
-                g.nodes[n][resource] = v
+            for attr_key, attr_value in upd_dict.items():
+                g.nodes[n][attr_key] = attr_value
+
+        for s, t, k in g.edges:
+            edge_data = g.edges[s, t, k]
+            upd_dict = {
+                "arrowhead": "vee",
+                "style": "solid",
+            }
+            if "label" in edge_data:
+                upd_dict["label"] = edge_data["label"]
+            for attr_key, attr_value in upd_dict.items():
+                g.edges[s, t, k][attr_key] = attr_value
 
         ag = nx.nx_agraph.to_agraph(g)
-        ag.draw(
-            os.path.join(self.fig_path, f"{self.prefix}_source2vc.pdf"),
-            "pdf",
-            prog="dot",
-        )
+        ag.graph_attr["rankdir"] = "LR"
+        ag.graph_attr["splines"] = "spline"
 
-    def plot_vc2vc(self, prune_leaves=False):
+        resource_nodes = [
+            get_auxnode_id(
+                AuxNodeType.RESOURCE,
+                resource=resource.name,
+                resource_type="resource",
+            )
+            for resource in self.ingestion_model.resources
+        ]
+        vertex_nodes = [
+            get_auxnode_id(AuxNodeType.VERTEX, vertex=v)
+            for v in sorted(self.schema.graph.vertex_config.vertex_set)
+            if get_auxnode_id(AuxNodeType.VERTEX, vertex=v) in g.nodes
+        ]
+        if resource_nodes:
+            ag.add_subgraph(resource_nodes, name="cluster_resources", rank="same")
+        if vertex_nodes:
+            ag.add_subgraph(vertex_nodes, name="cluster_vertices", rank="same")
+
+        self._draw(ag, f"{self.prefix}_source2vc")
+
+    def _extract_resource_vertex_reasons(self, resource) -> dict[str, set[str]]:
+        """Collect vertex references for a resource with lightweight reason labels."""
+        vertex_reasons: dict[str, set[str]] = {}
+        known_vertices = set(self.schema.graph.vertex_config.vertex_set)
+        actors = resource.root.collect_actors()
+
+        def _add(vertex_name: str, reason: str) -> None:
+            if vertex_name not in known_vertices:
+                return
+            if vertex_name not in vertex_reasons:
+                vertex_reasons[vertex_name] = set()
+            vertex_reasons[vertex_name].add(reason)
+
+        for actor in actors:
+            for vertex_name in actor.references_vertices():
+                _add(vertex_name, type(actor).__name__)
+
+            if isinstance(actor, VertexRouterActor):
+                for vertex_name in actor.type_map.values():
+                    _add(vertex_name, "VertexRouterActor(type_map)")
+                for vertex_name in actor.vertex_from_map:
+                    _add(vertex_name, "VertexRouterActor(vertex_from_map)")
+
+            if isinstance(actor, EdgeRouterActor):
+                for vertex_name in actor._source_type_map.values():
+                    _add(vertex_name, "EdgeRouterActor(source_type_map)")
+                for vertex_name in actor._target_type_map.values():
+                    _add(vertex_name, "EdgeRouterActor(target_type_map)")
+
+        return vertex_reasons
+
+    def plot_source2vc_detailed(self):
+        """Plot per-resource source-to-vertex mappings as dedicated detail pages."""
+        for resource in self.ingestion_model.resources:
+            g = nx.MultiDiGraph()
+            resource_id = get_auxnode_id(
+                AuxNodeType.RESOURCE,
+                resource=resource.name,
+                resource_type="resource",
+            )
+            g.add_node(
+                resource_id,
+                type=AuxNodeType.RESOURCE,
+                label=resource.name,
+            )
+
+            vertex_reasons = self._extract_resource_vertex_reasons(resource)
+            for vertex_name, reasons in sorted(vertex_reasons.items()):
+                vertex_id = get_auxnode_id(AuxNodeType.VERTEX, vertex=vertex_name)
+                g.add_node(
+                    vertex_id,
+                    type=AuxNodeType.VERTEX,
+                    label=vertex_name,
+                )
+                g.add_edge(resource_id, vertex_id, label=", ".join(sorted(reasons)))
+
+            for n in g.nodes():
+                props = g.nodes()[n]
+                upd_dict = {
+                    "shape": map_type2shape[props["type"]],
+                    "color": map_type2color[props["type"]],
+                    "style": "filled",
+                }
+                for attr_key, attr_value in upd_dict.items():
+                    g.nodes[n][attr_key] = attr_value
+
+            for s, t, k in g.edges:
+                edge_data = g.edges[s, t, k]
+                upd_dict = {
+                    "arrowhead": "vee",
+                    "style": "solid",
+                }
+                if "label" in edge_data:
+                    upd_dict["label"] = edge_data["label"]
+                for attr_key, attr_value in upd_dict.items():
+                    g.edges[s, t, k][attr_key] = attr_value
+
+            ag = nx.nx_agraph.to_agraph(g)
+            ag.graph_attr["rankdir"] = "LR"
+            self._draw(ag, f"{self.schema.metadata.name}.resource2vc-{resource.name}")
+
+    def plot_vc2vc(
+        self,
+        prune_leaves: bool = False,
+        partition: dict[str, str] | None = None,
+        partition_colors: dict[str, str] | None = None,
+        color_by_partition: bool = False,
+        group_by_partition: bool = False,
+        include_all_vertices: bool = True,
+        group_by_inferred_level: bool = False,
+    ):
         """Plot vertex collection relationships.
 
         Creates a visualization showing the relationships between vertex collections.
@@ -507,6 +689,12 @@ class SchemaPlotter:
 
         Args:
             prune_leaves: Whether to remove leaf nodes from the visualization
+            partition: Optional vertex->group mapping used for coloring/grouping
+            partition_colors: Optional group->color mapping for partition values
+            color_by_partition: Whether to color nodes using partition values
+            group_by_partition: Whether to add Graphviz clusters for each group
+            include_all_vertices: Whether to include vertices with no known edges
+            group_by_inferred_level: Group by inferred graph level (SCC-aware)
 
         Example:
             >>> plotter.plot_vc2vc(prune_leaves=True)
@@ -520,12 +708,14 @@ class SchemaPlotter:
 
         # Collect all edges: from edge_config and discovered from resources
         all_edges = {}
-        for edge_id, e in self.schema.edge_config.edges_items():
+        for edge_id, e in self.schema.graph.edge_config.edges_items():
             all_edges[edge_id] = e
         # Add discovered edges (they may already be in edge_config, but that's fine)
         for edge_id, e in discovered_edges.items():
             if edge_id not in all_edges:
                 all_edges[edge_id] = e
+
+        edge_pairs = [(source, target) for (source, target, _relation) in all_edges]
 
         # Create graph edges with relation labels
         for (source, target, relation), e in all_edges.items():
@@ -554,20 +744,37 @@ class SchemaPlotter:
                 )
             edges += [ee]
 
-        # Create nodes for all vertices involved in edges
-        for (source, target, relation), e in all_edges.items():
-            for v in (source, target):
-                nodes += [
-                    (
-                        get_auxnode_id(AuxNodeType.VERTEX, vertex=v),
-                        {
-                            "type": AuxNodeType.VERTEX,
-                            "label": get_auxnode_id(
-                                AuxNodeType.VERTEX, vertex=v, label=True
-                            ),
-                        },
-                    )
-                ]
+        # Create nodes for vertices involved in edges, optionally including all schema vertices
+        vertices_in_edges = {
+            vertex
+            for (source, target, _relation) in all_edges
+            for vertex in (source, target)
+        }
+        all_vertices = (
+            set(self.schema.graph.vertex_config.vertex_set)
+            if include_all_vertices
+            else vertices_in_edges
+        )
+
+        effective_partition = partition.copy() if partition is not None else {}
+        if group_by_inferred_level:
+            inferred_levels = self._infer_vertex_levels(edge_pairs)
+            effective_partition.update(
+                {vertex: f"level_{level}" for vertex, level in inferred_levels.items()}
+            )
+
+        for v in sorted(all_vertices):
+            nodes += [
+                (
+                    get_auxnode_id(AuxNodeType.VERTEX, vertex=v),
+                    {
+                        "type": AuxNodeType.VERTEX,
+                        "label": get_auxnode_id(
+                            AuxNodeType.VERTEX, vertex=v, label=True
+                        ),
+                    },
+                )
+            ]
 
         for nid, weight in nodes:
             g.add_node(nid, **weight)
@@ -584,6 +791,15 @@ class SchemaPlotter:
             )
             g.remove_nodes_from(nodes_to_remove)
 
+        partition_color_map = (
+            self._build_partition_color_map(
+                partition_values=set(effective_partition.values()),
+                partition_colors=partition_colors,
+            )
+            if effective_partition and color_by_partition
+            else {}
+        )
+
         for n in g.nodes():
             props = g.nodes()[n]
             upd_dict = {
@@ -591,6 +807,11 @@ class SchemaPlotter:
                 "color": map_type2color[props["type"]],
                 "style": "filled",
             }
+            if partition_color_map:
+                vertex_name = self._node_id_to_vertex(n)
+                group_key = effective_partition.get(vertex_name)
+                if group_key is not None:
+                    upd_dict["fillcolor"] = partition_color_map[group_key]
             for k, v in upd_dict.items():
                 g.nodes[n][k] = v
 
@@ -609,8 +830,23 @@ class SchemaPlotter:
                 g.edges[s, t, ix][k] = v
 
         ag = nx.nx_agraph.to_agraph(g)
-        ag.draw(
-            os.path.join(self.fig_path, f"{self.prefix}_vc2vc.pdf"),
-            "pdf",
-            prog="dot",
-        )
+        if group_by_partition and effective_partition:
+            partition_to_nodes: dict[str, list[str]] = {}
+            for node_id in g.nodes():
+                vertex_name = self._node_id_to_vertex(node_id)
+                group = effective_partition.get(vertex_name)
+                if group is None:
+                    continue
+                if group not in partition_to_nodes:
+                    partition_to_nodes[group] = []
+                partition_to_nodes[group].append(node_id)
+
+            for group in sorted(partition_to_nodes):
+                ag.add_subgraph(
+                    partition_to_nodes[group],
+                    name=f"cluster_partition_{group}",
+                    rank="same",
+                    label=str(group),
+                )
+
+        self._draw(ag, f"{self.prefix}_vc2vc")

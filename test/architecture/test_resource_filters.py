@@ -2,7 +2,7 @@
 
 Tests cover:
 - FilterExpression IS_NULL / IS_NOT_NULL across all flavours
-- TablePattern.build_query() with joins and filters
+- TableConnector.build_query() with joins and filters
 - Auto-JOIN generation helper (enrich_edge_pattern_with_joins)
 """
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from graflo.filter.onto import ComparisonOperator, FilterExpression, LogicalOperator
 from graflo.onto import ExpressionFlavor
-from graflo.util.onto import JoinClause, TablePattern
+from graflo.architecture.bindings import JoinClause, TableConnector
 
 
 # ---------------------------------------------------------------
@@ -130,20 +130,20 @@ class TestIsNullIsNotNull:
 
 
 # ---------------------------------------------------------------
-# Phase 2: TablePattern.build_query
+# Phase 2: TableConnector.build_query
 # ---------------------------------------------------------------
 
 
-class TestTablePatternBuildQuery:
-    """TablePattern.build_query() generates correct SQL."""
+class TestTableConnectorBuildQuery:
+    """TableConnector.build_query() generates correct SQL."""
 
     def test_simple_select_star(self):
-        tp = TablePattern(table_name="users")
+        tp = TableConnector(table_name="users")
         q = tp.build_query("public")
         assert q == 'SELECT * FROM "public"."users"'
 
     def test_with_date_filter(self):
-        tp = TablePattern(
+        tp = TableConnector(
             table_name="events",
             date_field="created_at",
             date_filter="> '2020-01-01'",
@@ -158,7 +158,7 @@ class TestTablePatternBuildQuery:
             cmp_operator=ComparisonOperator.EQ,
             value=["server"],
         )
-        tp = TablePattern(table_name="classes", filters=[f])
+        tp = TableConnector(table_name="classes", filters=[f])
         q = tp.build_query("myschema")
         assert "WHERE" in q
         assert "\"class_name\" = 'server'" in q
@@ -176,7 +176,7 @@ class TestTablePatternBuildQuery:
             cmp_operator=ComparisonOperator.GE,
             value=[18],
         )
-        tp = TablePattern(table_name="people", filters=[f1, f2])
+        tp = TableConnector(table_name="people", filters=[f1, f2])
         q = tp.build_query("public")
         assert "AND" in q
         assert '"status"' in q
@@ -189,7 +189,7 @@ class TestTablePatternBuildQuery:
             on_self="address_id",
             on_other="id",
         )
-        tp = TablePattern(table_name="users", joins=[jc])
+        tp = TableConnector(table_name="users", joins=[jc])
         q = tp.build_query("public")
         assert "LEFT JOIN" in q
         assert '"public"."addresses" a' in q
@@ -221,7 +221,7 @@ class TestTablePatternBuildQuery:
             field="t.id",
             cmp_operator=ComparisonOperator.IS_NOT_NULL,
         )
-        tp = TablePattern(
+        tp = TableConnector(
             table_name="cmdb_rel_ci",
             joins=[jc_s, jc_t],
             filters=[f1, f2],
@@ -244,13 +244,13 @@ class TestTablePatternBuildQuery:
             on_other="id",
             select_fields=["id", "class_name"],
         )
-        tp = TablePattern(table_name="rel", joins=[jc])
+        tp = TableConnector(table_name="rel", joins=[jc])
         q = tp.build_query("public")
         assert 's."id" AS "s__id"' in q
         assert 's."class_name" AS "s__class_name"' in q
 
     def test_explicit_select_columns(self):
-        tp = TablePattern(
+        tp = TableConnector(
             table_name="t",
             select_columns=["a", "b"],
         )
@@ -258,7 +258,7 @@ class TestTablePatternBuildQuery:
         assert q.startswith("SELECT a, b FROM")
 
     def test_schema_defaults_to_public(self):
-        tp = TablePattern(table_name="t")
+        tp = TableConnector(table_name="t")
         q = tp.build_query()
         assert '"public"."t"' in q
 
@@ -272,27 +272,34 @@ class TestAutoJoin:
     """enrich_edge_pattern_with_joins adds JoinClauses from edge defs."""
 
     def _make_schema_and_patterns(self):
-        """Build a minimal Schema + Patterns for the CMDB-like scenario."""
-        from graflo.architecture.schema import Schema
-        from graflo.util.onto import Patterns
+        """Build a minimal Schema + Connectors for the CMDB-like scenario."""
+        from graflo.architecture.schema import IngestionModel, Schema
+        from graflo.architecture.bindings import Bindings
 
         schema = Schema.model_validate(
             {
-                "general": {"name": "test", "version": "0.0.1"},
-                "vertex_config": {
-                    "vertices": [
-                        {"name": "server", "fields": ["id", "class_name"]},
-                        {"name": "database", "fields": ["id", "class_name"]},
-                    ],
+                "metadata": {"name": "test", "version": "0.0.1"},
+                "graph": {
+                    "vertex_config": {
+                        "vertices": [
+                            {"name": "server", "fields": ["id", "class_name"]},
+                            {"name": "database", "fields": ["id", "class_name"]},
+                        ],
+                    },
+                    "edge_config": {
+                        "edges": [
+                            {"source": "server", "target": "database"},
+                        ],
+                    },
                 },
-                "edge_config": {
-                    "edges": [
-                        {"source": "server", "target": "database"},
-                    ],
-                },
+                "db_profile": {},
+            }
+        )
+        ingestion_model = IngestionModel.model_validate(
+            {
                 "resources": [
                     {
-                        "resource_name": "cmdb_relations",
+                        "resource_name": "abc_relations",
                         "pipeline": [
                             {
                                 "edge": {
@@ -304,95 +311,96 @@ class TestAutoJoin:
                             }
                         ],
                     }
-                ],
+                ]
             }
         )
+        ingestion_model.finish_init(schema.graph)
 
-        patterns = Patterns(
-            table_patterns={
-                "server": TablePattern(table_name="classes", schema_name="sn"),
-                "database": TablePattern(table_name="classes", schema_name="sn"),
-                "cmdb_relations": TablePattern(
+        patterns = Bindings(
+            table_connectors={
+                "server": TableConnector(table_name="classes", schema_name="sn"),
+                "database": TableConnector(table_name="classes", schema_name="sn"),
+                "abc_relations": TableConnector(
                     table_name="cmdb_rel_ci", schema_name="sn"
                 ),
             },
         )
-        return schema, patterns
+        return schema, ingestion_model, patterns
 
     def test_enrichment_adds_joins(self):
-        from graflo.hq.auto_join import enrich_edge_pattern_with_joins
+        from graflo.hq.auto_join import enrich_edge_connector_with_joins
 
-        schema, patterns = self._make_schema_and_patterns()
-        resource = schema.fetch_resource("cmdb_relations")
-        pattern = patterns.table_patterns["cmdb_relations"]
+        schema, ingestion_model, bindings = self._make_schema_and_patterns()
+        resource = ingestion_model.fetch_resource("abc_relations")
+        connector = bindings.table_connectors["abc_relations"]
 
-        enrich_edge_pattern_with_joins(
+        enrich_edge_connector_with_joins(
             resource=resource,
-            pattern=pattern,
-            patterns=patterns,
-            vertex_config=schema.vertex_config,
+            connector=connector,
+            bindings=bindings,
+            vertex_config=schema.graph.vertex_config,
         )
 
-        assert len(pattern.joins) == 2
-        aliases = {j.alias for j in pattern.joins}
+        assert len(connector.joins) == 2
+        aliases = {j.alias for j in connector.joins}
         assert aliases == {"s", "t"}
         # The on_self fields come from edge match_source / match_target
-        on_self_cols = {j.on_self for j in pattern.joins}
+        on_self_cols = {j.on_self for j in connector.joins}
         assert on_self_cols == {"parent", "child"}
 
     def test_enrichment_adds_is_not_null_filters(self):
-        from graflo.hq.auto_join import enrich_edge_pattern_with_joins
+        from graflo.hq.auto_join import enrich_edge_connector_with_joins
 
-        schema, patterns = self._make_schema_and_patterns()
-        resource = schema.fetch_resource("cmdb_relations")
-        pattern = patterns.table_patterns["cmdb_relations"]
+        schema, ingestion_model, bindings = self._make_schema_and_patterns()
+        resource = ingestion_model.fetch_resource("abc_relations")
+        connector = bindings.table_connectors["abc_relations"]
 
-        enrich_edge_pattern_with_joins(
+        enrich_edge_connector_with_joins(
             resource=resource,
-            pattern=pattern,
-            patterns=patterns,
-            vertex_config=schema.vertex_config,
+            connector=connector,
+            bindings=bindings,
+            vertex_config=schema.graph.vertex_config,
         )
 
-        assert len(pattern.filters) == 2
-        rendered = [f(kind=ExpressionFlavor.SQL) for f in pattern.filters]
+        assert len(connector.filters) == 2
+        rendered = [f(kind=ExpressionFlavor.SQL) for f in connector.filters]
         assert 's."id" IS NOT NULL' in rendered
         assert 't."id" IS NOT NULL' in rendered
 
     def test_enrichment_noop_when_joins_already_set(self):
-        from graflo.hq.auto_join import enrich_edge_pattern_with_joins
+        from graflo.hq.auto_join import enrich_edge_connector_with_joins
 
-        schema, patterns = self._make_schema_and_patterns()
-        resource = schema.fetch_resource("cmdb_relations")
-        pattern = patterns.table_patterns["cmdb_relations"]
-        pattern.joins = [JoinClause(table="x", alias="x", on_self="a", on_other="b")]
+        schema, ingestion_model, bindings = self._make_schema_and_patterns()
+        resource = ingestion_model.fetch_resource("abc_relations")
+        connector = bindings.table_connectors["abc_relations"]
+        connector.joins = [JoinClause(table="x", alias="x", on_self="a", on_other="b")]
 
-        enrich_edge_pattern_with_joins(
+        enrich_edge_connector_with_joins(
             resource=resource,
-            pattern=pattern,
-            patterns=patterns,
-            vertex_config=schema.vertex_config,
+            connector=connector,
+            bindings=bindings,
+            vertex_config=schema.graph.vertex_config,
         )
 
         # Should not have modified the existing join
-        assert len(pattern.joins) == 1
-        assert pattern.joins[0].table == "x"
+        assert len(connector.joins) == 1
+        assert connector.joins[0].table == "x"
 
     def test_full_query_after_enrichment(self):
-        from graflo.hq.auto_join import enrich_edge_pattern_with_joins
+        from graflo.hq.auto_join import enrich_edge_connector_with_joins
 
-        schema, patterns = self._make_schema_and_patterns()
-        resource = schema.fetch_resource("cmdb_relations")
-        pattern = patterns.table_patterns["cmdb_relations"]
+        schema, ingestion_model, bindings = self._make_schema_and_patterns()
+        resource = ingestion_model.fetch_resource("abc_relations")
+        connector = bindings.table_connectors["abc_relations"]
 
-        enrich_edge_pattern_with_joins(
+        enrich_edge_connector_with_joins(
             resource=resource,
-            pattern=pattern,
-            patterns=patterns,
-            vertex_config=schema.vertex_config,
+            connector=connector,
+            bindings=bindings,
+            vertex_config=schema.graph.vertex_config,
         )
 
-        q = pattern.build_query("sn")
+        q = connector.build_query("sn")
         assert "LEFT JOIN" in q
         assert "IS NOT NULL" in q
         assert '"sn"."cmdb_rel_ci"' in q

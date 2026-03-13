@@ -11,8 +11,8 @@ import pandas as pd
 import pytest
 from suthing import FileHandle
 
+from graflo.architecture.manifest import GraphManifest
 from graflo.architecture.onto import GraphContainer
-from graflo.architecture.schema import Schema
 
 
 def _load_csv_as_dicts(csv_path: Path) -> list[dict]:
@@ -23,8 +23,11 @@ def _load_csv_as_dicts(csv_path: Path) -> list[dict]:
 
 @pytest.fixture
 def schema_csv_edge_weights():
-    schema_dict = FileHandle.load("test.config.schema", "csv-edge-weights.yaml")
-    return Schema.from_dict(schema_dict)
+    manifest = GraphManifest.from_config(
+        FileHandle.load("test.config.schema", "csv-edge-weights.yaml")
+    )
+    manifest.finish_init()
+    return manifest
 
 
 @pytest.fixture
@@ -37,7 +40,8 @@ def test_csv_edge_weights_one_edge_per_row(
     schema_csv_edge_weights, relations_data_csv_edge_weights
 ):
     """Each row in relations.csv must produce exactly one edge."""
-    resource = schema_csv_edge_weights.fetch_resource("relations")
+    ingestion_model = schema_csv_edge_weights.require_ingestion_model()
+    resource = ingestion_model.fetch_resource("relations")
     docs = [resource(doc) for doc in relations_data_csv_edge_weights]
     graph = GraphContainer.from_docs_list(docs)
 

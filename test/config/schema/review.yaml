@@ -1,49 +1,60 @@
-general:
-    name: review
-database_features:
-    db_flavor: neo4j
-    vertex_storage_names:
-        author: Author
-        researchField: ResearchField
-    vertex_indexes:
-        author:
-        -   fields: [id, full_name]
-        researchField:
-        -   fields: [id]
-    edge_indexes:
-    -   source: author
-        target: researchField
-        relation: belongsTo
-        purpose:
-        indexes:
-        -   fields:
-            -   t_obs
-resources:
--   resource_name: authors
-    apply:
-    -   vertex: author
-        "from": {id: author_id, full_name: FullName, hindex: HIndex}
-    -   vertex: researchField
-        "from": {id: research_sector}
-vertex_config:
-    vertices:
-    -   name: author
-        fields:
-        -   id
-        -   full_name
-        -   hindex
-        identity:
-        -   id
-        -   full_name
-    -   name: researchField
-        fields:
-        -   id
-        -   name
-        -   level
-        identity:
-        -   id
-edge_config:
-    edges:
-    -   source: author
-        target: researchField
-        relation: belongsTo
+schema:
+    metadata:
+        name: review
+    graph:
+        vertex_config:
+            vertices:
+            -   name: author
+                fields:
+                -   id
+                -   full_name
+                -   hindex
+                identity:
+                -   id
+                -   full_name
+            -   name: researchField
+                fields:
+                -   id
+                -   name
+                -   level
+                identity:
+                -   id
+        edge_config:
+            edges:
+            -   source: author
+                target: researchField
+                relation: belongsTo
+    db_profile:
+        db_flavor: neo4j
+        vertex_storage_names:
+            author: Author
+            researchField: ResearchField
+        vertex_indexes:
+            author:
+            -   fields:
+                -   id
+                -   full_name
+            researchField:
+            -   fields:
+                -   id
+        edge_indexes:
+        -   source: author
+            target: researchField
+            relation: belongsTo
+            purpose:
+            indexes:
+            -   fields:
+                -   t_obs
+ingestion_model:
+    resources:
+    -   resource_name: authors
+        apply:
+        -   vertex: author
+            from:
+                id: author_id
+                full_name: FullName
+                hindex: HIndex
+        -   vertex: researchField
+            from:
+                id: research_sector
+bindings: {}

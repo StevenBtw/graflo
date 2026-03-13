@@ -107,12 +107,15 @@ Transforming the data and ingesting it into an ArangoDB takes a few lines of cod
 
 ```python
 from suthing import FileHandle
-from graflo import Caster, Patterns, Schema
+from graflo import Caster, Bindings, GraphManifest
 from graflo.db.connection.onto import ArangoConfig, DBConfig
 
-schema = Schema.from_dict(FileHandle.load("schema.yaml"))
+manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 
 # Load config from file
 config_data = FileHandle.load("../arango.creds.json")
@@ -124,13 +127,13 @@ if not isinstance(conn_conf, ArangoConfig):
 # Or use from_docker_env() (recommended)
 # conn_conf = ArangoConfig.from_docker_env()
 
-from graflo.util.onto import FilePattern
+from graflo.architecture.bindings import FileConnector
 import pathlib
 
-patterns = Patterns()
-patterns.add_file_pattern(
+bindings = Bindings()
+bindings.add_file_connector(
     "work",
-    FilePattern(regex="\Sjson$", sub_path=pathlib.Path("."), resource_name="work")
+    FileConnector(regex="\Sjson$", sub_path=pathlib.Path("."), resource_name="work")
 )
 
 from graflo.hq.caster import IngestionParams
@@ -141,7 +144,7 @@ ingestion_params = IngestionParams(
 
 caster.ingest(
     target_db_config=conn_conf,  # Target database config
-    patterns=patterns,  # Source data patterns
+    bindings=bindings,  # Source data bindings
     ingestion_params=ingestion_params,
 )
 ```

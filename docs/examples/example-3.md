@@ -92,10 +92,13 @@ The ingestion process is straightforward:
 
 ```python
 from suthing import FileHandle
-from graflo import Caster, Patterns, Schema
+from graflo import Caster, Bindings, GraphManifest
 from graflo.db.connection.onto import Neo4jConfig
 
-schema = Schema.from_dict(FileHandle.load("schema.yaml"))
+manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Load config from docker/neo4j/.env (recommended)
 conn_conf = Neo4jConfig.from_docker_env()
@@ -108,18 +111,18 @@ conn_conf = Neo4jConfig.from_docker_env()
 #     bolt_port=7688,
 # )
 
-from graflo.util.onto import FilePattern
+from graflo.architecture.bindings import FileConnector
 import pathlib
 
-patterns = Patterns()
-patterns.add_file_pattern(
+bindings = Bindings()
+bindings.add_file_connector(
     "people",
-    FilePattern(regex="^relations.*\.csv$", sub_path=pathlib.Path("."), resource_name="people")
+    FileConnector(regex="^relations.*\.csv$", sub_path=pathlib.Path("."), resource_name="people")
 )
 
 from graflo.hq.caster import IngestionParams
 
-caster = Caster(schema)
+caster = Caster(schema=schema, ingestion_model=ingestion_model)
 
 ingestion_params = IngestionParams(
     clear_data=True,  # Clear existing data before ingesting
@@ -127,14 +130,14 @@ ingestion_params = IngestionParams(
 
 caster.ingest(
     target_db_config=conn_conf,  # Target database config
-    patterns=patterns,  # Source data patterns
+    bindings=bindings,  # Source data bindings
     ingestion_params=ingestion_params,
 )
 ```
 
 ## Use Cases
 
-This pattern is particularly useful for:
+This connector is particularly useful for:
  
 - **Business Intelligence**: Tracking multiple types of relationships between companies
 - **Temporal Analysis**: Analyzing how relationships evolve over time

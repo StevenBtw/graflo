@@ -1,13 +1,14 @@
-"""Graph engine for orchestrating schema inference, pattern creation, and ingestion.
+"""Graph engine for orchestrating schema inference, connector creation, and ingestion.
 
 This module provides the GraphEngine class which serves as the main orchestrator
-for graph database operations, coordinating between inference, pattern mapping,
+for graph database operations, coordinating between inference, connector mapping,
 and data ingestion.
 """
 
 import logging
 
-from graflo.architecture.schema import Schema
+from graflo.architecture.manifest import GraphManifest
+from graflo.architecture.schema import IngestionModel, Schema
 from graflo.onto import DBType
 from graflo.architecture.onto_sql import SchemaIntrospectionResult
 from graflo.db import ConnectionManager, PostgresConnection
@@ -15,7 +16,7 @@ from graflo.db import DBConfig, PostgresConfig, SparqlEndpointConfig
 from graflo.hq.caster import Caster, IngestionParams
 from graflo.hq.inferencer import InferenceManager
 from graflo.hq.resource_mapper import ResourceMapper
-from graflo.util.onto import Patterns
+from graflo.architecture.bindings import Bindings
 
 from pathlib import Path
 
@@ -25,18 +26,18 @@ logger = logging.getLogger(__name__)
 class GraphEngine:
     """Orchestrator for graph database operations.
 
-    GraphEngine coordinates schema inference, pattern creation, schema definition,
+    GraphEngine coordinates schema inference, connector creation, schema definition,
     and data ingestion, providing a unified interface for working with graph databases.
 
     The typical workflow is:
     1. infer_schema() - Infer schema from source database (if possible)
-    2. create_patterns() - Create patterns mapping resources to data sources (if possible)
+    2. create_bindings() - Create bindings mapping resources to data sources (if possible)
     3. define_schema() - Define schema in target database (if possible and necessary)
     4. ingest() - Ingest data into the target database
 
     Attributes:
         target_db_flavor: Target database flavor for schema sanitization
-        resource_mapper: ResourceMapper instance for pattern creation
+        resource_mapper: ResourceMapper instance for connector creation
     """
 
     def __init__(
@@ -73,14 +74,14 @@ class GraphEngine:
             )
             return inferencer.introspect(schema_name=schema_name)
 
-    def infer_schema(
+    def infer_manifest(
         self,
         postgres_config: PostgresConfig,
         schema_name: str | None = None,
         fuzzy_threshold: float = 0.8,
         discard_disconnected_vertices: bool = False,
-    ) -> Schema:
-        """Infer a graflo Schema from PostgreSQL database.
+    ) -> GraphManifest:
+        """Infer a GraphManifest from PostgreSQL database.
 
         Args:
             postgres_config: PostgresConfig instance
@@ -90,7 +91,7 @@ class GraphEngine:
                 any relation (and resources/actors that reference them). Default False.
 
         Returns:
-            Schema: Inferred schema with vertices, edges, and resources
+            GraphManifest: Inferred manifest with schema and ingestion model.
         """
         with PostgresConnection(postgres_config) as postgres_conn:
             inferencer = InferenceManager(
@@ -98,26 +99,29 @@ class GraphEngine:
                 target_db_flavor=self.target_db_flavor,
                 fuzzy_threshold=fuzzy_threshold,
             )
-            schema = inferencer.infer_complete_schema(schema_name=schema_name)
+            schema, ingestion_model = inferencer.infer_complete_schema(
+                schema_name=schema_name
+            )
         if discard_disconnected_vertices:
-            schema.remove_disconnected_vertices()
-        return schema
+            disconnected = schema.remove_disconnected_vertices()
+            ingestion_model.prune_to_graph(schema.graph, disconnected=disconnected)
+        return GraphManifest(graph_schema=schema, ingestion_model=ingestion_model)
 
-    def create_patterns(
+    def create_bindings(
         self,
         postgres_config: PostgresConfig,
         schema_name: str | None = None,
         datetime_columns: dict[str, str] | None = None,
         type_lookup_overrides: dict[str, dict] | None = None,
-    ) -> Patterns:
-        """Create Patterns from PostgreSQL tables.
+    ) -> Bindings:
+        """Create Bindings from PostgreSQL tables.
 
         Args:
             postgres_config: PostgresConfig instance
             schema_name: Schema name to introspect
             datetime_columns: Optional mapping of resource/table name to datetime
                 column name for date-range filtering (sets date_field per
-                TablePattern). Use with IngestionParams.datetime_after /
+                TableConnector). Use with IngestionParams.datetime_after /
                 datetime_before.
             type_lookup_overrides: Optional mapping of table name to type_lookup
                 spec for edge tables where source/target types come from a
@@ -125,10 +129,10 @@ class GraphEngine:
                 source, target, relation?}.
 
         Returns:
-            Patterns: Patterns object with TablePattern instances for all tables
+            Bindings: Bindings object with TableConnector instances for all tables
         """
         with PostgresConnection(postgres_config) as postgres_conn:
-            return self.resource_mapper.create_patterns_from_postgres(
+            return self.resource_mapper.create_bindings_from_postgres(
                 conn=postgres_conn,
                 schema_name=schema_name,
                 datetime_columns=datetime_columns,
@@ -137,7 +141,7 @@ class GraphEngine:
 
     def define_schema(
         self,
-        schema: Schema,
+        manifest: GraphManifest,
         target_db_config: DBConfig,
         recreate_schema: bool = False,
     ) -> None:
@@ -151,17 +155,19 @@ class GraphEngine:
         init_db raises SchemaExistsError and the script halts.
 
         Args:
-            schema: Schema configuration for the graph
+            manifest: GraphManifest with schema block.
             target_db_config: Target database connection configuration
             recreate_schema: If True, drop existing schema and define new one.
                 If False and schema/graph already exists, raises SchemaExistsError.
         """
-        # If effective_schema is not set, use schema.general.name as fallback
+        schema = manifest.require_schema()
+
+        # If effective_schema is not set, use schema.metadata.name as fallback
         if (
             target_db_config.can_be_target()
             and target_db_config.effective_schema is None
         ):
-            schema_name = schema.general.name
+            schema_name = schema.metadata.name
             # Map to the appropriate field based on DB type
             if target_db_config.connection_type == DBType.TIGERGRAPH:
                 # TigerGraph uses 'schema_name' field
@@ -171,7 +177,7 @@ class GraphEngine:
                 target_db_config.database = schema_name
 
         # Ensure schema reflects target DB so finish_init applies DB-specific defaults.
-        schema.database_features.db_flavor = target_db_config.connection_type
+        schema.db_profile.db_flavor = target_db_config.connection_type
         schema.finish_init()
 
         # Initialize database with schema definition
@@ -182,9 +188,8 @@ class GraphEngine:
 
     def define_and_ingest(
         self,
-        schema: Schema,
+        manifest: GraphManifest,
         target_db_config: DBConfig,
-        patterns: "Patterns | None" = None,
         ingestion_params: IngestionParams | None = None,
         recreate_schema: bool | None = None,
         clear_data: bool | None = None,
@@ -195,10 +200,8 @@ class GraphEngine:
         It's the recommended way to set up and populate a graph database.
 
         Args:
-            schema: Schema configuration for the graph
+            manifest: GraphManifest with schema/ingestion/bindings blocks.
             target_db_config: Target database connection configuration
-            patterns: Patterns instance mapping resources to data sources.
-                If None, defaults to empty Patterns()
             ingestion_params: IngestionParams instance with ingestion configuration.
                 If None, uses default IngestionParams()
             recreate_schema: If True, drop existing schema and define new one.
@@ -215,7 +218,7 @@ class GraphEngine:
 
         # Define schema first (halts with SchemaExistsError if schema exists and recreate_schema is False)
         self.define_schema(
-            schema=schema,
+            manifest=manifest,
             target_db_config=target_db_config,
             recreate_schema=recreate_schema,
         )
@@ -225,17 +228,15 @@ class GraphEngine:
             update={"clear_data": clear_data}
         )
         self.ingest(
-            schema=schema,
+            manifest=manifest,
             target_db_config=target_db_config,
-            patterns=patterns,
             ingestion_params=ingestion_params,
         )
 
     def ingest(
         self,
-        schema: Schema,
+        manifest: GraphManifest,
         target_db_config: DBConfig,
-        patterns: "Patterns | None" = None,
         ingestion_params: IngestionParams | None = None,
     ) -> None:
         """Ingest data into the graph database.
@@ -244,21 +245,27 @@ class GraphEngine:
         (without touching the schema) before ingestion.
 
         Args:
-            schema: Schema configuration for the graph
+            manifest: GraphManifest with schema/ingestion/bindings blocks.
             target_db_config: Target database connection configuration
-            patterns: Patterns instance mapping resources to data sources.
-                If None, defaults to empty Patterns()
             ingestion_params: IngestionParams instance with ingestion configuration.
                 If None, uses default IngestionParams()
         """
+        schema = manifest.require_schema()
+        ingestion_model = manifest.require_ingestion_model()
+        bindings = manifest.bindings
+
         ingestion_params = ingestion_params or IngestionParams()
         if ingestion_params.clear_data:
             with ConnectionManager(connection_config=target_db_config) as db_client:
                 db_client.clear_data(schema)
-        caster = Caster(schema=schema, ingestion_params=ingestion_params)
+        caster = Caster(
+            schema=schema,
+            ingestion_model=ingestion_model,
+            ingestion_params=ingestion_params,
+        )
         caster.ingest(
             target_db_config=target_db_config,
-            patterns=patterns or Patterns(),
+            bindings=bindings or Bindings(),
             ingestion_params=ingestion_params,
         )
 
@@ -273,7 +280,7 @@ class GraphEngine:
         endpoint_url: str | None = None,
         graph_uri: str | None = None,
         schema_name: str | None = None,
-    ) -> Schema:
+    ) -> tuple[Schema, IngestionModel]:
         """Infer a graflo Schema from an RDF / OWL ontology.
 
         Reads the TBox (class and property declarations) and produces
@@ -289,7 +296,7 @@ class GraphEngine:
             schema_name: Name for the resulting schema.
 
         Returns:
-            A fully initialised :class:`Schema`.
+            tuple[Schema, IngestionModel]: fully initialised schema and ingestion model.
         """
         from graflo.hq.rdf_inferencer import RdfInferenceManager
 
@@ -301,17 +308,17 @@ class GraphEngine:
             schema_name=schema_name,
         )
 
-    def create_patterns_from_rdf(
+    def create_bindings_from_rdf(
         self,
         source: str | Path,
         *,
         endpoint_url: str | None = None,
         graph_uri: str | None = None,
         sparql_config: SparqlEndpointConfig | None = None,
-    ) -> Patterns:
-        """Create :class:`Patterns` from an RDF ontology.
+    ) -> Bindings:
+        """Create :class:`Bindings` from an RDF ontology.
 
-        One :class:`SparqlPattern` is created per ``owl:Class`` found in the
+        One :class:`SparqlConnector` is created per ``owl:Class`` found in the
         ontology.
 
         Args:
@@ -319,21 +326,21 @@ class GraphEngine:
             endpoint_url: SPARQL endpoint for the *data* (ABox).
             graph_uri: Named graph containing the data.
             sparql_config: Optional :class:`SparqlEndpointConfig` to attach
-                to the resulting patterns for authentication.
+                to the resulting connectors for authentication.
 
         Returns:
-            Patterns with SPARQL patterns for each class.
+            Bindings with SPARQL connectors for each class.
         """
         from graflo.hq.rdf_inferencer import RdfInferenceManager
 
         mgr = RdfInferenceManager(target_db_flavor=self.target_db_flavor)
-        patterns = mgr.create_patterns(
+        bindings = mgr.create_bindings(
             source,
             endpoint_url=endpoint_url,
             graph_uri=graph_uri,
         )
 
         if sparql_config:
-            patterns.sparql_configs["default"] = sparql_config
+            bindings.sparql_configs["default"] = sparql_config
 
-        return patterns
+        return bindings

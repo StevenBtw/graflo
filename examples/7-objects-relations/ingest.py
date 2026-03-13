@@ -15,30 +15,33 @@ import pathlib
 
 from suthing import FileHandle
 
-from graflo import Patterns, Schema
+from graflo import Bindings, GraphManifest
 from graflo.db import ArangoConfig
 from graflo.hq import GraphEngine
 from graflo.hq.caster import IngestionParams
-from graflo.util.onto import FilePattern
+from graflo.architecture.bindings import FileConnector
 
-schema = Schema.from_dict(FileHandle.load("schema.yaml"))
+manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
+manifest.finish_init()
+schema = manifest.require_schema()
+ingestion_model = manifest.require_ingestion_model()
 
 # Load config from docker/arango/.env (or neo4j, tigergraph, falkordb)
 conn_conf = ArangoConfig.from_docker_env()
 db_type = conn_conf.connection_type
 
-patterns = Patterns()
-patterns.add_file_pattern(
+bindings = Bindings()
+bindings.add_file_connector(
     "objects",
-    FilePattern(
+    FileConnector(
         regex=r"^objects\.csv$",
         sub_path=pathlib.Path("."),
         resource_name="objects",
     ),
 )
-patterns.add_file_pattern(
+bindings.add_file_connector(
     "relations",
-    FilePattern(
+    FileConnector(
         regex=r"^relations\.csv$",
         sub_path=pathlib.Path("."),
         resource_name="relations",
@@ -46,14 +49,15 @@ patterns.add_file_pattern(
 )
 
 engine = GraphEngine(target_db_flavor=db_type)
+manifest = manifest.model_copy(update={"bindings": bindings})
+manifest.finish_init()
 engine.define_and_ingest(
-    schema=schema,
+    manifest=manifest,
     target_db_config=conn_conf,
-    patterns=patterns,
     ingestion_params=IngestionParams(clear_data=True),
     recreate_schema=True,
 )
 
 print("Ingestion complete!")
-print(f"Schema: {schema.general.name}")
-print(f"Vertices: {[v.name for v in schema.vertex_config.vertices]}")
+print(f"Schema: {schema.metadata.name}")
+print(f"Vertices: {[v.name for v in schema.graph.vertex_config.vertices]}")
