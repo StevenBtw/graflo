@@ -63,7 +63,7 @@ flowchart LR
         Files["CSV / JSON files"]
         PG["PostgreSQL"]
     end
-    subgraph patterns [Bindings]
+    subgraph bindings [Bindings]
         FP[FileConnector]
         TP[TableConnector]
         SP[SparqlConnector]
@@ -413,7 +413,7 @@ classDiagram
 
     class RegistryBuilder {
         +schema: Schema
-        +build(patterns, ingestion_params) DataSourceRegistry
+        +build(bindings, ingestion_params) DataSourceRegistry
     }
 
     class DataSourceRegistry {
