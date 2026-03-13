@@ -99,7 +99,47 @@ def knapsack(weights, ks_size=7):
 @click.option("-c", "--schema-path", type=click.Path(), required=True)
 @click.option("-o", "--figure-output-path", type=click.Path(), required=True)
 @click.option("-p", "--prune-low-degree-nodes", type=bool, default=False)
-def plot_schema(schema_path, figure_output_path, prune_low_degree_nodes):
+@click.option(
+    "--group-vc-by-level",
+    is_flag=True,
+    default=False,
+    help="Group vc2vc graph by inferred levels (SCC-aware layering).",
+)
+@click.option(
+    "--color-vc-by-level",
+    is_flag=True,
+    default=False,
+    help="Color vc2vc vertices by inferred levels.",
+)
+@click.option(
+    "--include-all-vertices/--edges-only-vertices",
+    default=True,
+    help="Include isolated vertex collections in vc2vc plot.",
+)
+@click.option(
+    "--output-format",
+    type=click.Choice(["pdf", "png"], case_sensitive=False),
+    default="pdf",
+    show_default=True,
+    help="Output figure format.",
+)
+@click.option(
+    "--output-dpi",
+    type=click.IntRange(min=72),
+    default=300,
+    show_default=True,
+    help="DPI used when output format is png.",
+)
+def plot_schema(
+    schema_path,
+    figure_output_path,
+    prune_low_degree_nodes,
+    group_vc_by_level,
+    color_vc_by_level,
+    include_all_vertices,
+    output_format,
+    output_dpi,
+):
     """Generate visualizations of the graph database schema.
 
     This command creates multiple visualizations of the schema:
@@ -114,18 +154,34 @@ def plot_schema(schema_path, figure_output_path, prune_low_degree_nodes):
         figure_output_path: Path where the visualization will be saved
         prune_low_degree_nodes: Whether to remove nodes with low connectivity
             from the visualization (default: False)
+        group_vc_by_level: Whether to cluster vc2vc by inferred graph level
+        color_vc_by_level: Whether to color vc2vc nodes by inferred graph level
+        include_all_vertices: Whether to include isolated vertex collections
+        output_format: Output image format (pdf or png)
+        output_dpi: DPI for raster outputs (png)
 
     Example:
         $ uv run plot_schema -c schema.yaml -o schema.png
     """
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
-    plotter = SchemaPlotter(schema_path, figure_output_path)
-    plotter.plot_vc2vc(prune_leaves=prune_low_degree_nodes)
+    plotter = SchemaPlotter(
+        schema_path,
+        figure_output_path,
+        output_format=output_format.lower(),
+        output_dpi=output_dpi if output_format.lower() == "png" else None,
+    )
+    plotter.plot_vc2vc(
+        prune_leaves=prune_low_degree_nodes,
+        group_by_inferred_level=(group_vc_by_level or color_vc_by_level),
+        color_by_partition=color_vc_by_level,
+        group_by_partition=group_vc_by_level,
+        include_all_vertices=include_all_vertices,
+    )
     plotter.plot_vc2fields()
     plotter.plot_resources()
-    # plotter.plot_source2vc()
-    # plotter.plot_source2vc_detailed()
+    plotter.plot_source2vc()
+    plotter.plot_source2vc_detailed()
 
 
 if __name__ == "__main__":
