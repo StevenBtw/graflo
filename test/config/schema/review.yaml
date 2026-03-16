@@ -37,7 +37,7 @@ schema:
             researchField:
             -   fields:
                 -   id
-        edge_indexes:
+        edge_specs:
         -   source: author
             target: researchField
             relation: belongsTo

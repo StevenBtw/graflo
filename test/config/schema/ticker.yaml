@@ -64,7 +64,7 @@ schema:
                 unique: false
                 fields:
                 -   name
-        edge_indexes:
+        edge_specs:
         -   source: ticker
             target: feature
             purpose:

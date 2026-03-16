@@ -808,7 +808,7 @@ class ManifestPlotter:
         rendered_edges: list[tuple] = []
 
         discovered_edges = self._discover_edges_from_resources()
-        configured_edges = dict(self.schema.graph.edge_config.edges_items())
+        configured_edges = dict(self.schema.graph.edge_config.items())
         all_edges = self._merge_edges(configured_edges, discovered_edges)
 
         known_vertices = set(self.schema.graph.vertex_config.vertex_set)

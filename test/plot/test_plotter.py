@@ -11,7 +11,7 @@ class _EdgeConfigStub:
     def __init__(self, edges: dict):
         self._edges = edges
 
-    def edges_items(self):
+    def items(self):
         return self._edges.items()
 
 

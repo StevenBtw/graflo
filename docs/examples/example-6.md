@@ -335,7 +335,7 @@ engine.define_and_ingest(
 
 print(f"Schema: {schema.metadata.name}")
 print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.graph.edge_config.edges_list()))}")
+print(f"Edges: {len(list(schema.graph.edge_config.values()))}")
 print(f"Resources: {len(ingestion_model.resources)}")
 ```
 

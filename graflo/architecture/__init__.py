@@ -20,7 +20,7 @@ Example:
     >>> resource = Resource(name="users", data=user_data)
 """
 
-from .database_features import DatabaseProfile, EdgeIndexSpec
+from .database_features import DatabaseProfile
 from .db_aware import EdgeConfigDBAware, SchemaDBAware, VertexConfigDBAware
 from .edge import Edge, EdgeConfig
 from .executor import ActorExecutor
@@ -44,7 +44,6 @@ __all__ = [
     "Edge",
     "EdgeConfig",
     "EdgeConfigDBAware",
-    "EdgeIndexSpec",
     "FieldType",
     "Index",
     "ActorExecutor",

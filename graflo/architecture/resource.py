@@ -203,7 +203,7 @@ class Resource(ConfigBaseModel):
             )
 
     def _validate_infer_edge_spec_targets(self, edge_config: EdgeConfig) -> None:
-        known_edge_ids = {edge_id for edge_id, _ in edge_config.edges_items()}
+        known_edge_ids = {edge_id for edge_id, _ in edge_config.items()}
 
         def _validate_list(field_name: str, specs: list[EdgeInferSpec]) -> None:
             unknown: list[EdgeId] = []
