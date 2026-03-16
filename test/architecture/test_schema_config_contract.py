@@ -1,5 +1,6 @@
 import pytest
 
+from graflo.architecture.actor.config import EdgeRouterActorConfig
 from graflo.architecture.manifest import GraphManifest
 from graflo.architecture.schema import Schema
 
@@ -131,3 +132,21 @@ def test_schema_rejects_edges_with_undefined_vertices():
 
     # Error details should include currently declared vertices for easier debugging.
     assert "Declared vertices: ['user']" in str(exc_info.value)
+
+
+def test_edge_router_requires_at_least_one_dynamic_type_side():
+    with pytest.raises(
+        ValueError,
+        match=(
+            "edge_router requires at least one of "
+            "source_type_field or target_type_field"
+        ),
+    ):
+        EdgeRouterActorConfig.model_validate(
+            {
+                "source": "person",
+                "target": "institution",
+                "source_fields": {"id": "source_id"},
+                "target_fields": {"id": "target_id"},
+            }
+        )

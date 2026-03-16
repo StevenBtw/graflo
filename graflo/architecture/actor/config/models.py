@@ -235,13 +235,31 @@ class EdgeRouterActorConfig(ConfigBaseModel):
     type: Literal["edge_router"] = PydanticField(
         default="edge_router", description="Actor type discriminator"
     )
-    source_type_field: str = PydanticField(
-        ...,
-        description="Document field whose value determines the source vertex type.",
+    source_type_field: str | None = PydanticField(
+        default=None,
+        description=(
+            "Document field whose value determines the source vertex type. "
+            "Provide this or source."
+        ),
     )
-    target_type_field: str = PydanticField(
-        ...,
-        description="Document field whose value determines the target vertex type.",
+    target_type_field: str | None = PydanticField(
+        default=None,
+        description=(
+            "Document field whose value determines the target vertex type. "
+            "Provide this or target."
+        ),
+    )
+    source: str | None = PydanticField(
+        default=None,
+        description=(
+            "Static source vertex type name. Provide this or source_type_field."
+        ),
+    )
+    target: str | None = PydanticField(
+        default=None,
+        description=(
+            "Static target vertex type name. Provide this or target_type_field."
+        ),
     )
     source_fields: dict[str, str] | None = PydanticField(
         default=None,
@@ -281,12 +299,34 @@ class EdgeRouterActorConfig(ConfigBaseModel):
     def set_type(cls, data: Any) -> Any:
         if (
             isinstance(data, dict)
-            and "source_type_field" in data
+            and (
+                "source_type_field" in data
+                or "target_type_field" in data
+                or "source" in data
+                or "target" in data
+            )
             and "type" not in data
         ):
             data = dict(data)
             data["type"] = "edge_router"
         return data
+
+    @model_validator(mode="after")
+    def validate_side_type_sources(self) -> "EdgeRouterActorConfig":
+        if self.source is None and self.source_type_field is None:
+            raise ValueError(
+                "edge_router requires source or source_type_field to be provided."
+            )
+        if self.target is None and self.target_type_field is None:
+            raise ValueError(
+                "edge_router requires target or target_type_field to be provided."
+            )
+        if self.source_type_field is None and self.target_type_field is None:
+            raise ValueError(
+                "edge_router requires at least one of "
+                "source_type_field or target_type_field."
+            )
+        return self
 
 
 ActorConfig = Annotated[
