@@ -34,3 +34,71 @@ def test_manifest_accepts_nested_schema_and_ingestion():
     manifest = GraphManifest.from_config(cfg)
     assert manifest.graph_schema is not None
     assert manifest.ingestion_model is not None
+
+
+def test_manifest_accepts_ingestion_transform_list():
+    cfg = {
+        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "ingestion_model": {
+            "resources": [],
+            "transforms": [
+                {
+                    "name": "normalize_id",
+                    "foo": "split_keep_part",
+                    "module": "graflo.util.transform",
+                    "input": ["id"],
+                    "output": ["_key"],
+                    "params": {"sep": "/", "keep": -1},
+                }
+            ],
+        },
+    }
+    manifest = GraphManifest.from_config(cfg)
+    assert manifest.ingestion_model is not None
+    assert len(manifest.ingestion_model.transforms) == 1
+
+
+def test_manifest_rejects_ingestion_transform_without_name():
+    cfg = {
+        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "ingestion_model": {
+            "resources": [],
+            "transforms": [
+                {
+                    "foo": "split_keep_part",
+                    "module": "graflo.util.transform",
+                    "input": ["id"],
+                    "output": ["_key"],
+                }
+            ],
+        },
+    }
+    with pytest.raises(ValueError, match="must define a non-empty name"):
+        GraphManifest.from_config(cfg)
+
+
+def test_manifest_rejects_duplicate_ingestion_transform_names():
+    cfg = {
+        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "ingestion_model": {
+            "resources": [],
+            "transforms": [
+                {
+                    "name": "normalize_id",
+                    "foo": "split_keep_part",
+                    "module": "graflo.util.transform",
+                    "input": ["id"],
+                    "output": ["_key"],
+                },
+                {
+                    "name": "normalize_id",
+                    "foo": "split_keep_part",
+                    "module": "graflo.util.transform",
+                    "input": ["other_id"],
+                    "output": ["_key"],
+                },
+            ],
+        },
+    }
+    with pytest.raises(ValueError, match="Duplicate ingestion transform names found"):
+        GraphManifest.from_config(cfg)

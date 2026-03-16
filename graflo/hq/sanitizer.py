@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING
 from collections import defaultdict
 
 from graflo.architecture.edge import Edge
-from graflo.architecture.schema import IngestionModel, Schema
+from graflo.architecture.ingestion_model import IngestionModel
+from graflo.architecture.schema import Schema
 from graflo.architecture.vertex import Field
 from graflo.onto import DBType
 

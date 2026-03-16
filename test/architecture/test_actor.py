@@ -385,7 +385,7 @@ def test_transform_tuple_output_maps_to_vertex_index_fields_in_order():
 
 def test_transform_named_proto_binding_executes_with_registered_transform():
     anw = ActorWrapper(
-        pipeline=[{"name": "to_int", "input": ["value"], "output": ["v"]}]
+        pipeline=[{"transform": "to_int", "input": ["value"], "output": ["v"]}]
     )
     transforms = {
         "to_int": ProtoTransform(name="to_int", module="builtins", foo="int", params={})
@@ -409,7 +409,7 @@ def test_transform_named_proto_binding_executes_with_registered_transform():
 
 
 def test_transform_named_proto_binding_inherits_input_output_from_library():
-    anw = ActorWrapper(pipeline=[{"name": "to_int"}])
+    anw = ActorWrapper(pipeline=[{"transform": "to_int"}])
     transforms = {
         "to_int": ProtoTransform(
             name="to_int",
@@ -437,7 +437,7 @@ def test_transform_named_proto_binding_inherits_input_output_from_library():
 
 def test_transform_named_proto_binding_local_io_overrides_library_io():
     anw = ActorWrapper(
-        pipeline=[{"name": "to_int", "input": ["raw_value"], "output": ["parsed"]}]
+        pipeline=[{"transform": "to_int", "input": ["raw_value"], "output": ["parsed"]}]
     )
     transforms = {
         "to_int": ProtoTransform(

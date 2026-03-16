@@ -12,7 +12,8 @@ import os
 
 from sqlalchemy import create_engine, text
 
-from graflo.architecture.schema import IngestionModel, Schema
+from graflo.architecture.ingestion_model import IngestionModel
+from graflo.architecture.schema import Schema
 from graflo.data_source.sql import SQLConfig, SQLDataSource
 from graflo.filter.onto import ComparisonOperator, FilterExpression
 from graflo.architecture.bindings import TableConnector
@@ -570,11 +571,7 @@ class TestEdgeResourceAutoJoin:
                 {
                     "resource_name": "transform_then_router",
                     "pipeline": [
-                        {
-                            "transform": {
-                                "map": {"raw_id": "id", "raw_label": "label"},
-                            }
-                        },
+                        {"map": {"raw_id": "id", "raw_label": "label"}},
                         {
                             "vertex_router": {
                                 "type_field": "kind",

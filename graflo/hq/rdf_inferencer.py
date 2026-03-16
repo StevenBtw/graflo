@@ -25,11 +25,11 @@ from typing import Any
 
 from graflo.architecture.edge import Edge, EdgeConfig
 from graflo.architecture.database_features import DatabaseProfile
+from graflo.architecture.ingestion_model import IngestionModel
 from graflo.architecture.resource import Resource
 from graflo.architecture.schema import (
     GraphMetadata,
     GraphModel,
-    IngestionModel,
     Schema,
 )
 from graflo.architecture.vertex import Field as VertexField, Vertex, VertexConfig

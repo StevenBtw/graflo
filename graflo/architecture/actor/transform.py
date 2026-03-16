@@ -23,11 +23,11 @@ class TransformActor(Actor):
     def __init__(self, config: TransformActorConfig):
         self._kwargs = config.model_dump(by_alias=True)
         self.transforms: dict[str, ProtoTransform] = {}
-        self.name = config.name
+        self.transform = config.transform
         self.params = config.params
         self.t: Transform = Transform(
             map=config.map or {},
-            name=config.name,
+            name=config.transform,
             params=config.params,
             module=config.module,
             foo=config.foo,
@@ -38,7 +38,7 @@ class TransformActor(Actor):
         )
 
     def fetch_important_items(self) -> dict[str, Any]:
-        items = self._fetch_items_from_dict(("name",))
+        items = self._fetch_items_from_dict(("transform",))
         items.update({"t.input": self.t.input, "t.output": self.t.output})
         return items
 
@@ -49,13 +49,14 @@ class TransformActor(Actor):
     def init_transforms(self, init_ctx: ActorInitContext) -> None:
         self.transforms = init_ctx.transforms
         try:
-            pt = ProtoTransform(
-                **{
-                    k: self._kwargs[k]
-                    for k in ProtoTransform.get_fields_members()
-                    if k in self._kwargs
-                }
-            )
+            pt_kwargs = {
+                k: self._kwargs[k]
+                for k in ProtoTransform.get_fields_members()
+                if k in self._kwargs
+            }
+            if "name" not in pt_kwargs and self.transform is not None:
+                pt_kwargs["name"] = self.transform
+            pt = ProtoTransform(**pt_kwargs)
             if pt.name is not None and pt._foo is not None:
                 if pt.name not in self.transforms:
                     self.transforms[pt.name] = pt
@@ -66,8 +67,8 @@ class TransformActor(Actor):
 
     def finish_init(self, init_ctx: ActorInitContext) -> None:
         self.transforms = init_ctx.transforms
-        if self.name is not None:
-            pt = self.transforms.get(self.name, None)
+        if self.transform is not None:
+            pt = self.transforms.get(self.transform, None)
             if pt is not None:
                 next_params = self.t.params if self.t.params else pt.params
                 next_input = self.t.input if self.t.input else pt.input

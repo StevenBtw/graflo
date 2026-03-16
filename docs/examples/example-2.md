@@ -65,8 +65,8 @@ Let's define the mappings. We will apply `keep_suffix_id` to `id` and `doi` fiel
 ```yaml
 -   resource_name: work
     apply:
-    -   name: keep_suffix_id
-    -   name: keep_suffix_id
+    -   transform: keep_suffix_id
+    -   transform: keep_suffix_id
         params:
             sep: "/"
             keep: [-2, -1]
@@ -78,7 +78,7 @@ Let's define the mappings. We will apply `keep_suffix_id` to `id` and `doi` fiel
     -   key: referenced_works
         apply:
         -   vertex: work
-        -   name: keep_suffix_id
+        -   transform: keep_suffix_id
     -   source: work
         target: work
         match_source: _top_level

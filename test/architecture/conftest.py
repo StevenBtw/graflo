@@ -262,7 +262,7 @@ def resource_descend():
         apply:
         - key: abc
           apply:
-            name: a
+            transform: a
         - vertex: work
         """
     )
@@ -420,7 +420,7 @@ def sample_openalex_authors():
 def resource_openalex_authors():
     an = yaml.safe_load("""
     -   vertex: author
-    -   name: keep_suffix_id
+    -   transform: keep_suffix_id
         foo: split_keep_part
         module: graflo.util.transform
         params:
@@ -433,7 +433,7 @@ def resource_openalex_authors():
     -   key: last_known_institution
         apply:
         -   vertex: institution   
-        -   name: keep_suffix_id
+        -   transform: keep_suffix_id
     -   source: author
         target: institution
         weights:

@@ -22,25 +22,6 @@ def normalize_actor_step(data: dict[str, Any]) -> dict[str, Any]:
         data["type"] = "vertex"
         return data
 
-    if "transform" in data:
-        inner = data.pop("transform")
-        if isinstance(inner, dict):
-            data.update(inner)
-        if "switch" in data:
-            switch = data.pop("switch")
-            if isinstance(switch, dict) and switch:
-                key = next(iter(switch))
-                vals = switch[key]
-                if isinstance(vals, (list, tuple)) and len(vals) >= 2:
-                    data.setdefault("input", [key])
-                    data.setdefault("dress", {"key": vals[0], "value": vals[1]})
-        if "dress" in data and isinstance(data["dress"], (list, tuple)):
-            vals = data["dress"]
-            if len(vals) >= 2:
-                data["dress"] = {"key": vals[0], "value": vals[1]}
-        data["type"] = "transform"
-        return data
-
     if "edge" in data:
         inner = data.pop("edge")
         if isinstance(inner, dict):
@@ -106,7 +87,7 @@ def normalize_actor_step(data: dict[str, Any]) -> dict[str, Any]:
         return data
 
     if "type" not in data and (
-        "name" in data
+        "transform" in data
         or "map" in data
         or "rule" in data
         or "switch" in data

@@ -717,7 +717,7 @@ transforms:
 resources:
 - resource_name: works
   apply:
-  - name: keep_suffix_id   # references the transform above
+  - transform: keep_suffix_id   # references the transform above
     input: [doi]            # override input for this usage
   - vertex: work
 ```

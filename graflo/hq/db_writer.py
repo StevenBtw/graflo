@@ -13,8 +13,9 @@ from uuid import uuid4
 
 from graflo.architecture.edge import Edge
 from graflo.architecture.db_aware import EdgeRuntime, SchemaDBAware
+from graflo.architecture.ingestion_model import IngestionModel
 from graflo.architecture.onto import GraphContainer
-from graflo.architecture.schema import IngestionModel, Schema
+from graflo.architecture.schema import Schema
 from graflo.db import ConnectionManager
 from graflo.db import DBConfig
 from graflo.onto import DBType

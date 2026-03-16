@@ -36,7 +36,8 @@ from .bindings import (
 from .onto import Index
 from .resource import Resource
 from .manifest import GraphManifest
-from .schema import GraphMetadata, GraphModel, IngestionModel, Schema
+from .ingestion_model import IngestionModel
+from .schema import GraphMetadata, GraphModel, Schema
 from .vertex import FieldType, Vertex, VertexConfig
 
 __all__ = [

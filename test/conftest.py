@@ -285,8 +285,8 @@ def resource_with_dynamic_relations():
                 -   type: vertex
                     name: institution
                     transforms:
-                    -   name: keep_suffix_id
-                    -   name: keep_suffix_id
+                    -   transform: keep_suffix_id
+                    -   transform: keep_suffix_id
                         fields:
                         -   ror
                 -   key: associated_institutions
@@ -294,7 +294,7 @@ def resource_with_dynamic_relations():
                     -   type: vertex
                         name: institution
                         transforms:
-                        -   name: keep_suffix_id
+                        -   transform: keep_suffix_id
                     -   type: edge
                         edge:
                             source: institution
@@ -328,26 +328,6 @@ def resource_with_dynamic_relations():
     edge_config:
         edges: []
     transforms:
-        keep_suffix_id:
-            foo: split_keep_part
-            module: graflo.util.transform
-            params:
-                sep: "/"
-                keep: -1
-            input:
-            -   id
-            output:
-            -   _key
-
-    """
-    )
-    return vc
-
-
-@pytest.fixture()
-def resource_openalex_works():
-    return yaml.safe_load("""
-    -   vertex: work
     -   name: keep_suffix_id
         foo: split_keep_part
         module: graflo.util.transform
@@ -358,7 +338,27 @@ def resource_openalex_works():
         -   id
         output:
         -   _key
-    -   name: keep_suffix_id
+
+    """
+    )
+    return vc
+
+
+@pytest.fixture()
+def resource_openalex_works():
+    return yaml.safe_load("""
+    -   vertex: work
+    -   transform: keep_suffix_id
+        foo: split_keep_part
+        module: graflo.util.transform
+        params:
+            sep: "/"
+            keep: -1
+        input:
+        -   id
+        output:
+        -   _key
+    -   transform: keep_suffix_id
         params:
             sep: "/"
             keep: [-2, -1]
@@ -369,7 +369,7 @@ def resource_openalex_works():
     -   key: referenced_works
         apply:
         -   vertex: work
-        -   name: keep_suffix_id
+        -   transform: keep_suffix_id
     -   source: work
         target: work
     """)

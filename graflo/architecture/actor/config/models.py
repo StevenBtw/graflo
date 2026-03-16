@@ -47,8 +47,8 @@ class TransformActorConfig(ConfigBaseModel):
     map: dict[str, str] | None = PydanticField(
         default=None, description="Field mapping: output_key -> input_key"
     )
-    name: str | None = PydanticField(
-        default=None, description="Named transform function"
+    transform: str | None = PydanticField(
+        default=None, description="Name of a declared transform to apply"
     )
     params: dict[str, Any] = PydanticField(
         default_factory=dict, description="Transform function parameters"
