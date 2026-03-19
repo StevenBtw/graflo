@@ -7,9 +7,9 @@ from typing import Any
 
 from graflo.architecture.actor.base import Actor, ActorInitContext
 from graflo.architecture.actor.config import EdgeRouterActorConfig
-from graflo.architecture.edge import Edge, EdgeConfig
+from graflo.architecture.schema.edge import Edge, EdgeConfig
 from graflo.architecture.onto import ExtractionContext, LocationIndex, VertexRep
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 
 logger = logging.getLogger(__name__)
 

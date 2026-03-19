@@ -34,6 +34,7 @@ from .architecture import (
     Edge,
     EdgeConfig,
     FieldType,
+    CoreSchema,
     GraphModel,
     Index,
     IngestionModel,
@@ -82,6 +83,7 @@ __all__ = [
     # Architecture
     "Schema",
     "GraphMetadata",
+    "CoreSchema",
     "GraphModel",
     "DatabaseProfile",
     "IngestionModel",

@@ -33,7 +33,7 @@ def load_ingestion_model(
     manifest = load_manifest(path)
     ingestion_model = manifest.require_ingestion_model()
     if schema is not None:
-        ingestion_model.finish_init(schema.graph)
+        ingestion_model.finish_init(schema.core_schema)
     return ingestion_model
 
 
@@ -44,13 +44,13 @@ def _stable_hash(payload_obj: Any) -> str:
 
 def graph_hash(schema: Schema) -> str:
     """Stable hash over logical graph model only."""
-    return _stable_hash(schema.graph.to_minimal_canonical_dict())
+    return _stable_hash(schema.core_schema.to_minimal_canonical_dict())
 
 
 def schema_hash(schema: Schema) -> str:
     """Stable hash over schema deployment contract (graph + DB profile)."""
     payload = {
-        "graph": schema.graph.to_minimal_canonical_dict(),
+        "core_schema": schema.core_schema.to_minimal_canonical_dict(),
         "db_profile": schema.db_profile.to_minimal_canonical_dict(),
     }
     return _stable_hash(payload)

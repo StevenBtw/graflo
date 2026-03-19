@@ -5,10 +5,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from graflo.architecture.edge import EdgeConfig
+from graflo.architecture.schema.edge import EdgeConfig
 from graflo.architecture.onto import EdgeId, ExtractionContext, LocationIndex
 from graflo.architecture.transform import ProtoTransform
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 
 
 class ActorConstants:

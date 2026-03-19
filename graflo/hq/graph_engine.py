@@ -105,7 +105,9 @@ class GraphEngine:
             )
         if discard_disconnected_vertices:
             disconnected = schema.remove_disconnected_vertices()
-            ingestion_model.prune_to_graph(schema.graph, disconnected=disconnected)
+            ingestion_model.prune_to_graph(
+                schema.core_schema, disconnected=disconnected
+            )
         return GraphManifest(graph_schema=schema, ingestion_model=ingestion_model)
 
     def create_bindings(

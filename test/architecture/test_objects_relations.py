@@ -159,7 +159,7 @@ class TestRelationsResourceMixedTypeSources:
             {
                 "schema": {
                     "metadata": {"name": "mixed_edge_router_types"},
-                    "graph": {
+                    "core_schema": {
                         "vertex_config": {
                             "vertices": [
                                 {

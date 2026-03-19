@@ -54,9 +54,9 @@ import abc
 import logging
 from typing import Any, ClassVar, TypeVar
 
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.architecture.schema import Schema
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 from graflo.onto import (
     AggregationType,
     DB_TYPE_TO_EXPRESSION_FLAVOR,
@@ -146,8 +146,10 @@ class Connection(abc.ABC):
         Args:
             schema: Schema containing vertex and edge configurations
         """
-        self.define_vertex_indexes(schema.graph.vertex_config, schema=schema)
-        self.define_edge_indexes(list(schema.graph.edge_config.values()), schema=schema)
+        self.define_vertex_indexes(schema.core_schema.vertex_config, schema=schema)
+        self.define_edge_indexes(
+            list(schema.core_schema.edge_config.values()), schema=schema
+        )
 
     @abc.abstractmethod
     def define_schema(self, schema: Schema):

@@ -82,8 +82,8 @@ FileHandle.dump(schema.model_dump(exclude_defaults=True), schema_output_file)
 
 logger.info(
     "Inferred schema: %d vertices, %d edges",
-    len(schema.graph.vertex_config.vertices),
-    len(list(schema.graph.edge_config.values())),
+    len(schema.core_schema.vertex_config.vertices),
+    len(list(schema.core_schema.edge_config.values())),
 )
 
 # ---------------------------------------------------------------------------
@@ -149,8 +149,8 @@ print("\n" + "=" * 80)
 print("Ingestion complete!")
 print("=" * 80)
 print(f"\nSchema: {schema.metadata.name}")
-print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.graph.edge_config.values()))}")
+print(f"Vertices: {len(schema.core_schema.vertex_config.vertices)}")
+print(f"Edges: {len(list(schema.core_schema.edge_config.values()))}")
 print(f"Resources: {len(ingestion_model.resources)}")
 print("=" * 80)
 

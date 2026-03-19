@@ -8,7 +8,7 @@ Universal types (FieldType enum) are defined in graflo.architecture.vertex.
 This module provides TigerGraph-specific mappings and aliases.
 """
 
-from graflo.architecture.vertex import FieldType
+from graflo.architecture.schema.vertex import FieldType
 
 # Type aliases for TigerGraph
 # Maps common type name variants to standard FieldType values

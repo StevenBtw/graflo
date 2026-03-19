@@ -90,6 +90,10 @@ class Field(ConfigBaseModel):
         default=None,
         description="Optional field type for databases that require it (e.g. TigerGraph: INT, STRING). None for schema-agnostic backends.",
     )
+    description: str | None = PydanticField(
+        default=None,
+        description="Optional semantic description of the field for schema inference and downstream reasoning.",
+    )
 
     @field_validator("type", mode="before")
     @classmethod
@@ -159,7 +163,11 @@ def _dict_to_field(field_dict: dict[str, Any]) -> Field:
     name = field_dict.get("name")
     if name is None:
         raise ValueError(f"Field dict must have 'name' key: {field_dict}")
-    return Field(name=name, type=field_dict.get("type"))
+    return Field(
+        name=name,
+        type=field_dict.get("type"),
+        description=field_dict.get("description"),
+    )
 
 
 def _normalize_fields_item(item: str | Field | dict[str, Any]) -> Field:
@@ -226,6 +234,10 @@ class Vertex(ConfigBaseModel):
     filters: list[FilterExpression] = PydanticField(
         default_factory=list,
         description="Filter expressions (logical formulae) applied when querying this vertex.",
+    )
+    description: str | None = PydanticField(
+        default=None,
+        description="Optional semantic description of the vertex meaning, role, and intended interpretation.",
     )
 
     @field_validator("fields", mode="before")

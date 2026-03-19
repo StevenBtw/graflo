@@ -60,4 +60,4 @@ engine.define_and_ingest(
 
 print("Ingestion complete!")
 print(f"Schema: {schema.metadata.name}")
-print(f"Vertices: {[v.name for v in schema.graph.vertex_config.vertices]}")
+print(f"Vertices: {[v.name for v in schema.core_schema.vertex_config.vertices]}")

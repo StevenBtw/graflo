@@ -18,7 +18,7 @@ from graflo.filter.onto import ComparisonOperator, FilterExpression
 from graflo.architecture.bindings import JoinClause, TableConnector
 
 if TYPE_CHECKING:
-    from graflo.architecture.vertex import VertexConfig
+    from graflo.architecture.schema.vertex import VertexConfig
     from graflo.architecture.bindings import Bindings
 
 logger = logging.getLogger(__name__)

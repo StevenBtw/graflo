@@ -10,7 +10,7 @@ def _minimal_schema() -> Schema:
     return Schema.model_validate(
         {
             "metadata": {"name": "kg"},
-            "graph": {
+            "core_schema": {
                 "vertex_config": {
                     "vertices": [
                         {"name": "a", "fields": ["id"], "identity": ["id"]},
@@ -27,7 +27,7 @@ def test_manifest_minimal_canonical_roundtrip_is_idempotent() -> None:
     cfg = {
         "schema": {
             "metadata": {"name": "kg", "version": "1.0.0", "description": None},
-            "graph": {
+            "core_schema": {
                 "vertex_config": {
                     "vertices": [
                         {"name": "person", "fields": ["id"], "identity": ["id"]}
@@ -80,7 +80,7 @@ def test_ingestion_model_strict_transform_reference_fails_fast() -> None:
     )
 
     try:
-        ingestion_model.finish_init(schema.graph, strict_references=True)
+        ingestion_model.finish_init(schema.core_schema, strict_references=True)
         assert False, "Expected strict transform reference validation to fail"
     except ValueError as exc:
         assert "was not found in ingestion_model.transforms" in str(exc)
@@ -91,7 +91,7 @@ def test_registry_builder_strict_mode_aggregates_missing_connectors() -> None:
     ingestion_model = IngestionModel.model_validate(
         {"resources": [{"name": "r1", "pipeline": [{"vertex": "a"}]}], "transforms": []}
     )
-    ingestion_model.finish_init(schema.graph)
+    ingestion_model.finish_init(schema.core_schema)
 
     builder = RegistryBuilder(schema, ingestion_model)
     params = IngestionParams()
@@ -117,11 +117,11 @@ def test_resource_finish_init_does_not_mutate_shared_schema_edge_config() -> Non
         }
     )
 
-    assert len(schema.graph.edge_config.edges) == 0
-    ingestion_model.finish_init(schema.graph)
+    assert len(schema.core_schema.edge_config.edges) == 0
+    ingestion_model.finish_init(schema.core_schema)
 
     # Shared logical schema stays untouched.
-    assert len(schema.graph.edge_config.edges) == 0
+    assert len(schema.core_schema.edge_config.edges) == 0
     # Runtime resource edge configs receive local dynamic edge registrations.
     assert len(ingestion_model.resources[0].edge_config.edges) == 1
     assert len(ingestion_model.resources[1].edge_config.edges) == 1

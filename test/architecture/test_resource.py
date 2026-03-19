@@ -2,9 +2,9 @@ import logging
 
 import pytest
 
-from graflo.architecture.edge import EdgeConfig
+from graflo.architecture.schema.edge import EdgeConfig
 from graflo.architecture.resource import Resource, _resolve_type_caster
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 
 logger = logging.getLogger(__name__)
 

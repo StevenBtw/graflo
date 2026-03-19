@@ -23,16 +23,16 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from graflo.architecture.edge import Edge, EdgeConfig
+from graflo.architecture.schema.edge import Edge, EdgeConfig
 from graflo.architecture.database_features import DatabaseProfile
 from graflo.architecture.ingestion_model import IngestionModel
 from graflo.architecture.resource import Resource
 from graflo.architecture.schema import (
+    CoreSchema,
     GraphMetadata,
-    GraphModel,
     Schema,
 )
-from graflo.architecture.vertex import Field as VertexField, Vertex, VertexConfig
+from graflo.architecture.schema.vertex import Field as VertexField, Vertex, VertexConfig
 from graflo.onto import DBType
 from graflo.architecture.bindings import Bindings, SparqlConnector
 
@@ -208,11 +208,13 @@ class RdfInferenceManager:
         effective_name = schema_name or "rdf_schema"
         schema = Schema(
             metadata=GraphMetadata(name=effective_name),
-            graph=GraphModel(vertex_config=vertex_config, edge_config=edge_config),
+            core_schema=CoreSchema(
+                vertex_config=vertex_config, edge_config=edge_config
+            ),
             db_profile=DatabaseProfile(db_flavor=self.target_db_flavor),
         )
         ingestion_model = IngestionModel(resources=resources)
-        ingestion_model.finish_init(schema.graph)
+        ingestion_model.finish_init(schema.core_schema)
         return schema, ingestion_model
 
     def create_bindings(

@@ -250,7 +250,7 @@ class RegistryBuilder:
                     resource=resource,
                     connector=connector,
                     bindings=bindings,
-                    vertex_config=self.schema.graph.vertex_config,
+                    vertex_config=self.schema.core_schema.vertex_config,
                 )
 
             date_column = connector.date_field or ingestion_params.datetime_column

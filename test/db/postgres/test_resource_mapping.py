@@ -2,14 +2,14 @@
 
 from collections import defaultdict
 
-from graflo.architecture.edge import EdgeConfig
+from graflo.architecture.schema.edge import EdgeConfig
 from graflo.architecture.onto_sql import (
     ColumnInfo,
     EdgeTableInfo,
     SchemaIntrospectionResult,
     VertexTableInfo,
 )
-from graflo.architecture.vertex import Field, Vertex, VertexConfig
+from graflo.architecture.schema.vertex import Field, Vertex, VertexConfig
 from graflo.db.postgres.resource_mapping import PostgresResourceMapper
 from graflo.hq.fuzzy_matcher import FuzzyMatcher
 

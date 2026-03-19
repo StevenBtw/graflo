@@ -104,7 +104,7 @@ def ingest_atomic(conn_conf, current_path, test_db_name, schema_o, mode, n_cores
     ingestion_model = fetch_manifest_obj(
         mode, dynamic_edge_feedback=True
     ).require_ingestion_model()
-    ingestion_model.finish_init(schema_o.graph, dynamic_edge_feedback=True)
+    ingestion_model.finish_init(schema_o.core_schema, dynamic_edge_feedback=True)
     for resource in ingestion_model.resources:
         resource_name = resource.name
         # Create a FileConnector that matches files for this resource

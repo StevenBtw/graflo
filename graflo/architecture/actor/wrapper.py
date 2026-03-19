@@ -21,7 +21,7 @@ from graflo.architecture.actor.config import (
 )
 from graflo.architecture.actor.edge_render import add_blank_collections
 from graflo.architecture.assemble import assemble_edges
-from graflo.architecture.edge import EdgeConfig
+from graflo.architecture.schema.edge import EdgeConfig
 from graflo.architecture.onto import (
     ActionContext,
     AssemblyContext,
@@ -30,7 +30,7 @@ from graflo.architecture.onto import (
     GraphEntity,
     LocationIndex,
 )
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 from graflo.util.merge import merge_doc_basis
 from graflo.util.transform import pick_unique_dict
 

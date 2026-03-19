@@ -11,7 +11,7 @@ from graflo.architecture.actor.config import (
     VertexRouterActorConfig,
 )
 from graflo.architecture.onto import ExtractionContext, LocationIndex
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 
 if TYPE_CHECKING:
     from graflo.architecture.actor.wrapper import ActorWrapper

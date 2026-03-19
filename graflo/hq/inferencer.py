@@ -76,8 +76,8 @@ class InferenceManager:
         """
         return self.mapper.create_resources_from_tables(
             introspection_result,
-            schema.graph.vertex_config,
-            schema.graph.edge_config,
+            schema.core_schema.vertex_config,
+            schema.core_schema.edge_config,
             vertex_attribute_mappings=self.sanitizer.vertex_attribute_mappings,
             fuzzy_threshold=self.mapper.fuzzy_threshold,
         )
@@ -112,7 +112,7 @@ class InferenceManager:
         # Create ingestion model from inferred resources.
         resources = self.create_resources(introspection_result, schema)
         ingestion_model = IngestionModel(resources=resources)
-        ingestion_model.finish_init(schema.graph)
+        ingestion_model.finish_init(schema.core_schema)
 
         return schema, ingestion_model
 

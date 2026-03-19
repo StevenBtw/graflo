@@ -33,7 +33,7 @@ from graflo.architecture.onto import (
     EdgeType,
     Weight,
 )
-from graflo.architecture.vertex import Field, VertexConfig
+from graflo.architecture.schema.vertex import Field, VertexConfig
 
 
 # Default relation name for TigerGraph edges when relation is not specified
@@ -53,7 +53,11 @@ def _normalize_direct_item(item: str | Field | dict[str, Any]) -> Field:
         name = item.get("name")
         if name is None:
             raise ValueError(f"Field dict must have 'name' key: {item}")
-        return Field(name=name, type=item.get("type"))
+        return Field(
+            name=name,
+            type=item.get("type"),
+            description=item.get("description"),
+        )
     raise TypeError(f"Field must be str, Field, or dict, got {type(item)}")
 
 
@@ -158,6 +162,10 @@ class EdgeBase(ConfigBaseModel):
     match: str | None = PydanticField(
         default=None,
         description="Match discriminant for edge creation.",
+    )
+    description: str | None = PydanticField(
+        default=None,
+        description="Optional semantic description of edge intent, direction semantics, and business meaning.",
     )
 
 

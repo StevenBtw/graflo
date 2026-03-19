@@ -89,7 +89,7 @@ Use `bindings` for **where data comes from**.
 ## Authoring tips
 
 - Keep resource names unique across `ingestion_model.resources`.
-- Ensure every `vertex`/`source`/`target` referenced by resources exists in `schema.graph`.
+- Ensure every `vertex`/`source`/`target` referenced by resources exists in `schema.core_schema`.
 - Quote `"from"` in YAML because `from` is a reserved keyword.
 - Prefer explicit `relation` names for multi-edge models.
 - Keep `ingestion_model.transforms` ordered intentionally; transforms are applied in declaration/appearance order within pipelines.

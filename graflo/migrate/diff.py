@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.architecture.schema import Schema
-from graflo.architecture.vertex import Field
+from graflo.architecture.schema.vertex import Field
 from graflo.migrate.models import (
     MigrationOperation,
     OperationType,
@@ -103,11 +103,11 @@ class SchemaDiff:
     ) -> list[MigrationOperation]:
         old_vertices = {
             vertex.name: vertex
-            for vertex in self.schema_old.graph.vertex_config.vertices
+            for vertex in self.schema_old.core_schema.vertex_config.vertices
         }
         new_vertices = {
             vertex.name: vertex
-            for vertex in self.schema_new.graph.vertex_config.vertices
+            for vertex in self.schema_new.core_schema.vertex_config.vertices
         }
         old_names = set(old_vertices)
         new_names = set(new_vertices)
@@ -195,10 +195,10 @@ class SchemaDiff:
 
     def _diff_edges(self, conflicts: list[SchemaConflict]) -> list[MigrationOperation]:
         old_edges = {
-            edge.edge_id: edge for edge in self.schema_old.graph.edge_config.edges
+            edge.edge_id: edge for edge in self.schema_old.core_schema.edge_config.edges
         }
         new_edges = {
-            edge.edge_id: edge for edge in self.schema_new.graph.edge_config.edges
+            edge.edge_id: edge for edge in self.schema_new.core_schema.edge_config.edges
         }
         old_ids = set(old_edges)
         new_ids = set(new_edges)
@@ -286,19 +286,19 @@ class SchemaDiff:
     def _diff_database_features(self) -> list[MigrationOperation]:
         operations: list[MigrationOperation] = []
         all_vertices = (
-            self.schema_old.graph.vertex_config.vertex_set
-            | self.schema_new.graph.vertex_config.vertex_set
+            self.schema_old.core_schema.vertex_config.vertex_set
+            | self.schema_new.core_schema.vertex_config.vertex_set
         )
 
         for vertex_name in sorted(all_vertices):
             old_ix = (
                 _vertex_index_tuples(self.schema_old, vertex_name)
-                if vertex_name in self.schema_old.graph.vertex_config.vertex_set
+                if vertex_name in self.schema_old.core_schema.vertex_config.vertex_set
                 else set()
             )
             new_ix = (
                 _vertex_index_tuples(self.schema_new, vertex_name)
-                if vertex_name in self.schema_new.graph.vertex_config.vertex_set
+                if vertex_name in self.schema_new.core_schema.vertex_config.vertex_set
                 else set()
             )
             for ix in sorted(new_ix - old_ix):
@@ -321,10 +321,10 @@ class SchemaDiff:
                 )
 
         old_edges = {
-            edge.edge_id: edge for edge in self.schema_old.graph.edge_config.edges
+            edge.edge_id: edge for edge in self.schema_old.core_schema.edge_config.edges
         }
         new_edges = {
-            edge.edge_id: edge for edge in self.schema_new.graph.edge_config.edges
+            edge.edge_id: edge for edge in self.schema_new.core_schema.edge_config.edges
         }
         all_edge_ids = set(old_edges) | set(new_edges)
         for edge_id in sorted(all_edge_ids):

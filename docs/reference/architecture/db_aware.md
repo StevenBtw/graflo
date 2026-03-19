@@ -1,3 +1,3 @@
-# `graflo.architecture.db_aware`
+# `graflo.architecture.schema.db_aware`
 
-::: graflo.architecture.db_aware
+::: graflo.architecture.schema.db_aware

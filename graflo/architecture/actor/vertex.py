@@ -12,7 +12,7 @@ from graflo.architecture.onto import (
     TransformPayload,
     VertexRep,
 )
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 from graflo.onto import ExpressionFlavor
 from graflo.util.merge import merge_doc_basis
 

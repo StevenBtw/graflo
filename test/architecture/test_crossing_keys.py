@@ -1,7 +1,7 @@
 import logging
 
 from graflo.architecture.actor import ActorInitContext, ActorWrapper
-from graflo.architecture.edge import EdgeConfig
+from graflo.architecture.schema.edge import EdgeConfig
 from graflo.architecture.onto import ActionContext, LocationIndex, VertexRep
 
 logger = logging.getLogger(__name__)

@@ -10,10 +10,10 @@ import logging
 from typing import TYPE_CHECKING
 
 
-from graflo.architecture.edge import Edge, EdgeConfig, WeightConfig
+from graflo.architecture.schema.edge import Edge, EdgeConfig, WeightConfig
 from graflo.architecture.database_features import DatabaseProfile
-from graflo.architecture.schema import GraphMetadata, GraphModel, Schema
-from graflo.architecture.vertex import Field, FieldType, Vertex, VertexConfig
+from graflo.architecture.schema import CoreSchema, GraphMetadata, Schema
+from graflo.architecture.schema.vertex import Field, FieldType, Vertex, VertexConfig
 from graflo.onto import DBType
 
 from graflo.architecture.onto_sql import EdgeTableInfo, SchemaIntrospectionResult
@@ -356,7 +356,9 @@ class PostgresSchemaInferencer:
         # Create schema (ingestion model is created separately)
         schema = Schema(
             metadata=metadata,
-            graph=GraphModel(vertex_config=vertex_config, edge_config=edge_config),
+            core_schema=CoreSchema(
+                vertex_config=vertex_config, edge_config=edge_config
+            ),
             db_profile=DatabaseProfile(
                 db_flavor=self.db_flavor,
                 vertex_storage_names={v.name: v.name for v in vertex_config.vertices},

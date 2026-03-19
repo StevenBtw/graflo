@@ -37,7 +37,7 @@ from pydantic import AliasChoices, Field as PydanticField, PrivateAttr, model_va
 
 from graflo.architecture.actor import ActorInitContext, ActorWrapper, EdgeActor
 from graflo.architecture.base import ConfigBaseModel
-from graflo.architecture.edge import Edge, EdgeConfig
+from graflo.architecture.schema.edge import Edge, EdgeConfig
 from graflo.architecture.executor import ActorExecutor
 from graflo.architecture.onto import (
     EdgeId,
@@ -45,7 +45,7 @@ from graflo.architecture.onto import (
     GraphEntity,
 )
 from graflo.architecture.transform import ProtoTransform
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 
 logger = logging.getLogger(__name__)
 

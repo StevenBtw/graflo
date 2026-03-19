@@ -25,12 +25,12 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
 
     # Verify schema structure
     assert schema is not None
-    assert schema.graph.vertex_config is not None
-    assert schema.graph.edge_config is not None
+    assert schema.core_schema.vertex_config is not None
+    assert schema.core_schema.edge_config is not None
     assert schema.metadata is not None
 
     # Check vertex tables (users, products)
-    vertex_names = [v.name for v in schema.graph.vertex_config.vertices]
+    vertex_names = [v.name for v in schema.core_schema.vertex_config.vertices]
     assert "users" in vertex_names, f"Expected 'users' in vertices, got {vertex_names}"
     assert "products" in vertex_names, (
         f"Expected 'products' in vertices, got {vertex_names}"
@@ -38,15 +38,15 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
 
     # Check edge tables (purchases, follows)
     # Edge objects are accessed via _edges_map, which uses edge_id (source, target, relation) as key
-    edge_ids = list(schema.graph.edge_config._edges_map.keys())
+    edge_ids = list(schema.core_schema.edge_config._edges_map.keys())
     # Find edges by checking source/target combinations
     purchases_found = any(
         e.source == "users" and e.target == "products"
-        for e in schema.graph.edge_config._edges_map.values()
+        for e in schema.core_schema.edge_config._edges_map.values()
     )
     follows_found = any(
         e.source == "users" and e.target == "users"
-        for e in schema.graph.edge_config._edges_map.values()
+        for e in schema.core_schema.edge_config._edges_map.values()
     )
     assert purchases_found, (
         f"Expected purchases edge (users -> products), got edges: {edge_ids}"
@@ -57,7 +57,7 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
 
     # Verify users vertex fields
     users_vertex = next(
-        v for v in schema.graph.vertex_config.vertices if v.name == "users"
+        v for v in schema.core_schema.vertex_config.vertices if v.name == "users"
     )
     field_names = [f.name for f in users_vertex.fields]
     assert "id" in field_names, f"Expected 'id' in users fields, got {field_names}"
@@ -91,7 +91,7 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
     purchases_edge = next(
         (
             e
-            for e in schema.graph.edge_config._edges_map.values()
+            for e in schema.core_schema.edge_config._edges_map.values()
             if e.source == "users" and e.target == "products"
         ),
         None,
@@ -147,15 +147,15 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
     print("\n" + "=" * 80)
     print("Schema Inference Results:")
     print("=" * 80)
-    print(f"\nVertices ({len(schema.graph.vertex_config.vertices)}):")
-    for v in schema.graph.vertex_config.vertices:
+    print(f"\nVertices ({len(schema.core_schema.vertex_config.vertices)}):")
+    for v in schema.core_schema.vertex_config.vertices:
         field_types = ", ".join(
             [f"{f.name}:{f.type if f.type else 'None'}" for f in v.fields[:5]]
         )
         print(f"  - {v.name}: {field_types}...")
 
-    print(f"\nEdges ({len(schema.graph.edge_config._edges_map)}):")
-    for edge_id, e in schema.graph.edge_config._edges_map.items():
+    print(f"\nEdges ({len(schema.core_schema.edge_config._edges_map)}):")
+    for edge_id, e in schema.core_schema.edge_config._edges_map.items():
         weights_info = ""
         if e.weights:
             weight_count = len(e.weights.direct) + len(e.weights.vertices)
@@ -183,7 +183,7 @@ def test_infer_schema_returns_manifest(conn_conf, load_mock_schema):
     ingestion_model = manifest.require_ingestion_model()
 
     assert schema.metadata.name == "public"
-    assert len(schema.graph.vertex_config.vertices) > 0
+    assert len(schema.core_schema.vertex_config.vertices) > 0
     assert len(ingestion_model.resources) > 0
 
 
@@ -213,17 +213,19 @@ def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
 
         # Verify schema structure
         assert schema is not None, "Schema should be inferred"
-        assert schema.graph.vertex_config is not None, (
+        assert schema.core_schema.vertex_config is not None, (
             "Schema should have vertex_config"
         )
-        assert schema.graph.edge_config is not None, "Schema should have edge_config"
+        assert schema.core_schema.edge_config is not None, (
+            "Schema should have edge_config"
+        )
         assert schema.metadata is not None, "Schema should have metadata"
         assert schema.metadata.name == "public", (
             f"Expected schema name 'public', got {schema.metadata.name}"
         )
 
         # Check vertex tables (users, products) - should be detected correctly via pg_catalog
-        vertex_names = [v.name for v in schema.graph.vertex_config.vertices]
+        vertex_names = [v.name for v in schema.core_schema.vertex_config.vertices]
         assert "users" in vertex_names, (
             f"Expected 'users' in vertices when using pg_catalog, got {vertex_names}"
         )
@@ -235,16 +237,16 @@ def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
         )
 
         # Check edge tables (purchases, follows) - should be detected correctly via pg_catalog
-        edge_ids = list(schema.graph.edge_config._edges_map.keys())
+        edge_ids = list(schema.core_schema.edge_config._edges_map.keys())
         # Purchases edge can be in either direction (users -> products or products -> users)
         purchases_found = any(
             (e.source == "users" and e.target == "products")
             or (e.source == "products" and e.target == "users")
-            for e in schema.graph.edge_config._edges_map.values()
+            for e in schema.core_schema.edge_config._edges_map.values()
         )
         follows_found = any(
             e.source == "users" and e.target == "users"
-            for e in schema.graph.edge_config._edges_map.values()
+            for e in schema.core_schema.edge_config._edges_map.values()
         )
         assert purchases_found, (
             f"Expected purchases edge (users <-> products) when using pg_catalog, "
@@ -257,7 +259,7 @@ def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
 
         # Verify users vertex fields - should be correctly inferred via pg_catalog
         users_vertex = next(
-            v for v in schema.graph.vertex_config.vertices if v.name == "users"
+            v for v in schema.core_schema.vertex_config.vertices if v.name == "users"
         )
         field_names = [f.name for f in users_vertex.fields]
         assert "id" in field_names, (
@@ -292,7 +294,7 @@ def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
         purchases_edge = next(
             (
                 e
-                for e in schema.graph.edge_config._edges_map.values()
+                for e in schema.core_schema.edge_config._edges_map.values()
                 if (e.source == "users" and e.target == "products")
                 or (e.source == "products" and e.target == "users")
             ),
@@ -353,15 +355,15 @@ def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
         print("\n" + "=" * 80)
         print("Schema Inference Results (using pg_catalog fallback):")
         print("=" * 80)
-        print(f"\nVertices ({len(schema.graph.vertex_config.vertices)}):")
-        for v in schema.graph.vertex_config.vertices:
+        print(f"\nVertices ({len(schema.core_schema.vertex_config.vertices)}):")
+        for v in schema.core_schema.vertex_config.vertices:
             field_types = ", ".join(
                 [f"{f.name}:{f.type if f.type else 'None'}" for f in v.fields[:5]]
             )
             print(f"  - {v.name}: {field_types}...")
 
-        print(f"\nEdges ({len(schema.graph.edge_config._edges_map)}):")
-        for edge_id, e in schema.graph.edge_config._edges_map.items():
+        print(f"\nEdges ({len(schema.core_schema.edge_config._edges_map)}):")
+        for edge_id, e in schema.core_schema.edge_config._edges_map.items():
             weights_info = ""
             if e.weights:
                 weight_count = len(e.weights.direct) + len(e.weights.vertices)

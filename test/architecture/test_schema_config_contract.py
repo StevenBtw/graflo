@@ -17,7 +17,7 @@ def _minimal_graph() -> dict:
 def test_manifest_requires_nested_schema_block():
     cfg = {
         "metadata": {"name": "kg"},
-        "graph": _minimal_graph(),
+        "core_schema": _minimal_graph(),
     }
     with pytest.raises(ValueError):
         GraphManifest.from_config(cfg)
@@ -30,7 +30,7 @@ def test_manifest_requires_at_least_one_block():
 
 def test_manifest_accepts_nested_schema_and_ingestion():
     cfg = {
-        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "schema": {"metadata": {"name": "kg"}, "core_schema": _minimal_graph()},
         "ingestion_model": {"resources": []},
     }
     manifest = GraphManifest.from_config(cfg)
@@ -40,7 +40,7 @@ def test_manifest_accepts_nested_schema_and_ingestion():
 
 def test_manifest_accepts_ingestion_transform_list():
     cfg = {
-        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "schema": {"metadata": {"name": "kg"}, "core_schema": _minimal_graph()},
         "ingestion_model": {
             "resources": [],
             "transforms": [
@@ -62,7 +62,7 @@ def test_manifest_accepts_ingestion_transform_list():
 
 def test_manifest_rejects_ingestion_transform_without_name():
     cfg = {
-        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "schema": {"metadata": {"name": "kg"}, "core_schema": _minimal_graph()},
         "ingestion_model": {
             "resources": [],
             "transforms": [
@@ -81,7 +81,7 @@ def test_manifest_rejects_ingestion_transform_without_name():
 
 def test_manifest_rejects_duplicate_ingestion_transform_names():
     cfg = {
-        "schema": {"metadata": {"name": "kg"}, "graph": _minimal_graph()},
+        "schema": {"metadata": {"name": "kg"}, "core_schema": _minimal_graph()},
         "ingestion_model": {
             "resources": [],
             "transforms": [
@@ -114,7 +114,7 @@ def test_schema_rejects_edges_with_undefined_vertices():
         Schema.model_validate(
             {
                 "metadata": {"name": "kg"},
-                "graph": {
+                "core_schema": {
                     "vertex_config": {
                         "vertices": [
                             {"name": "user", "fields": ["id"], "identity": ["id"]},

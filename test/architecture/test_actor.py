@@ -8,7 +8,7 @@ from graflo.architecture.actor import (
     TransformActor,
     VertexActor,
 )
-from graflo.architecture.edge import EdgeConfig
+from graflo.architecture.schema.edge import EdgeConfig
 from graflo.architecture.onto import ActionContext, LocationIndex, VertexRep
 from graflo.architecture.actor.config import (
     VertexActorConfig,
@@ -16,7 +16,7 @@ from graflo.architecture.actor.config import (
     validate_actor_step,
 )
 from graflo.architecture.transform import ProtoTransform
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 
 logger = logging.getLogger(__name__)
 

@@ -437,7 +437,7 @@ def _apply_vertex_filters(
 
 def test_vertex_config_parses_foo_filters(vertex_config_with_filters):
     """VertexConfig correctly parses foo-style filters from YAML into FilterExpressions."""
-    from graflo.architecture.vertex import VertexConfig
+    from graflo.architecture.schema.vertex import VertexConfig
 
     vc = VertexConfig.model_validate(vertex_config_with_filters)
     filters = vc.filters("feature")
@@ -449,7 +449,7 @@ def test_vertex_config_parses_foo_filters(vertex_config_with_filters):
 
 
 def test_vertex_config_no_filters_for_unknown_vertex(vertex_config_with_filters):
-    from graflo.architecture.vertex import VertexConfig
+    from graflo.architecture.schema.vertex import VertexConfig
 
     vc = VertexConfig.model_validate(vertex_config_with_filters)
     assert vc.filters("nonexistent") == []
@@ -457,7 +457,7 @@ def test_vertex_config_no_filters_for_unknown_vertex(vertex_config_with_filters)
 
 def test_vertex_filter_integration(vertex_config_with_filters, sample_vertex_docs):
     """End-to-end: YAML -> VertexConfig -> filter docs (mirrors actor._filter_and_aggregate_vertex_docs)."""
-    from graflo.architecture.vertex import VertexConfig
+    from graflo.architecture.schema.vertex import VertexConfig
 
     vc = VertexConfig.model_validate(vertex_config_with_filters)
     result = _apply_vertex_filters(vc, "feature", sample_vertex_docs)
@@ -474,7 +474,7 @@ def test_vertex_filter_integration(vertex_config_with_filters, sample_vertex_doc
 
 def test_vertex_filter_no_filters_passes_all(sample_vertex_docs):
     """A vertex with no filters keeps all documents."""
-    from graflo.architecture.vertex import VertexConfig
+    from graflo.architecture.schema.vertex import VertexConfig
 
     vc = VertexConfig.model_validate(
         {"vertices": [{"name": "raw", "fields": ["name", "value"]}]}

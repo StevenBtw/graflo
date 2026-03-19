@@ -40,7 +40,7 @@ def _build_bound_schema(
     schema = Schema.model_validate(
         {
             "metadata": {"name": name, "version": "0.0.1"},
-            "graph": {
+            "core_schema": {
                 "vertex_config": vertex_config,
                 "edge_config": edge_config,
             },
@@ -48,7 +48,7 @@ def _build_bound_schema(
         }
     )
     ingestion_model = IngestionModel.model_validate({"resources": resources})
-    ingestion_model.finish_init(schema.graph)
+    ingestion_model.finish_init(schema.core_schema)
     _INGESTION_BY_SCHEMA_ID[id(schema)] = ingestion_model
     return schema
 
@@ -291,7 +291,7 @@ class TestEdgeResourceAutoJoin:
             resource=resource,
             connector=tp_edge,
             bindings=patterns,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         q = tp_edge.build_query("main")
@@ -323,7 +323,7 @@ class TestEdgeResourceAutoJoin:
             resource=resource,
             connector=tp_edge,
             bindings=bindings,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         # SQLite doesn't use schema prefixes, so build query manually

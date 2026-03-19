@@ -6,7 +6,7 @@ from typing import Any
 
 from graflo.architecture.actor.base import Actor, ActorInitContext
 from graflo.architecture.actor.config import EdgeActorConfig
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.architecture.onto import ExtractionContext, LocationIndex
 
 

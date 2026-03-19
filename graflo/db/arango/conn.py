@@ -30,13 +30,13 @@ from typing import Any, cast
 from arango import ArangoClient
 from arango.graph import Graph
 
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.architecture.onto import (
     Index,
     IndexType,
 )
 from graflo.architecture.schema import Schema
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 from graflo.db.arango.query import fetch_fields_query
 from graflo.db.arango.util import render_filters
 from graflo.db.conn import Connection, SchemaExistsError
@@ -339,7 +339,9 @@ class ArangoConnection(Connection):
             schema: Schema containing collection definitions
         """
         self.define_vertex_classes(schema)
-        self.define_edge_classes(list(schema.graph.edge_config.values()), schema=schema)
+        self.define_edge_classes(
+            list(schema.core_schema.edge_config.values()), schema=schema
+        )
 
     def define_vertex_classes(self, schema: Schema) -> None:
         """Define vertex collections in ArangoDB.

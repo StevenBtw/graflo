@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from graflo.architecture.vertex import Field
+from graflo.architecture.schema.vertex import Field
 from graflo.db.nebula.util import (
     escape_nebula_string,
     make_vid,

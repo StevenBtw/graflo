@@ -10,16 +10,17 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from graflo.architecture.database_features import DatabaseProfile
-from graflo.architecture.edge import (
+from graflo.architecture.onto import EdgeId, Index
+from graflo.onto import DBType
+
+from .edge import (
     DEFAULT_TIGERGRAPH_RELATION,
     DEFAULT_TIGERGRAPH_RELATION_WEIGHTNAME,
     Edge,
     EdgeConfig,
     WeightConfig,
 )
-from graflo.architecture.onto import EdgeId, Index
-from graflo.architecture.vertex import Field, FieldType, VertexConfig
-from graflo.onto import DBType
+from .vertex import Field, FieldType, VertexConfig
 
 
 @dataclass(frozen=True)

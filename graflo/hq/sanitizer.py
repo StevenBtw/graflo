@@ -11,10 +11,10 @@ from collections import Counter
 from typing import TYPE_CHECKING
 from collections import defaultdict
 
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.architecture.ingestion_model import IngestionModel
 from graflo.architecture.schema import Schema
-from graflo.architecture.vertex import Field
+from graflo.architecture.schema.vertex import Field
 from graflo.onto import DBType
 
 from graflo.db.util import load_reserved_words, sanitize_attribute_name
@@ -77,7 +77,7 @@ class SchemaSanitizer:
             return schema
 
         # First pass: Sanitize physical vertex storage names
-        for vertex in schema.graph.vertex_config.vertices:
+        for vertex in schema.core_schema.vertex_config.vertices:
             dbname = schema.db_profile.vertex_storage_name(vertex.name)
             sanitized_vertex_name = sanitize_attribute_name(
                 dbname, self.reserved_words, suffix=f"_{VERTEX_SUFFIX}"
@@ -92,7 +92,7 @@ class SchemaSanitizer:
                 )
 
         # Second pass: Sanitize vertex field names
-        for vertex in schema.graph.vertex_config.vertices:
+        for vertex in schema.core_schema.vertex_config.vertices:
             for field in vertex.fields:
                 original_name = field.name
                 sanitized_name = sanitize_attribute_name(
@@ -115,10 +115,10 @@ class SchemaSanitizer:
 
         vertex_names = {
             schema.db_profile.vertex_storage_name(vertex.name)
-            for vertex in schema.graph.vertex_config.vertices
+            for vertex in schema.core_schema.vertex_config.vertices
         }
 
-        for edge in schema.graph.edge_config.edges:
+        for edge in schema.core_schema.edge_config.edges:
             if not edge.relation:
                 continue
 
@@ -170,7 +170,7 @@ class SchemaSanitizer:
         if schema.db_profile.db_flavor == DBType.TIGERGRAPH:
             # Group edges by relation
             edges_by_relation: dict[str | None, list[Edge]] = {}
-            for edge in schema.graph.edge_config.edges:
+            for edge in schema.core_schema.edge_config.edges:
                 # Use sanitized dbname when grouping by relation for TigerGraph
                 relation = (
                     schema.db_profile.edge_relation_name(
@@ -203,7 +203,7 @@ class SchemaSanitizer:
                         (
                             source_vertex,
                             tuple(
-                                schema.graph.vertex_config.identity_fields(
+                                schema.core_schema.vertex_config.identity_fields(
                                     source_vertex
                                 )
                             ),
@@ -215,7 +215,7 @@ class SchemaSanitizer:
                         (
                             target_vertex,
                             tuple(
-                                schema.graph.vertex_config.identity_fields(
+                                schema.core_schema.vertex_config.identity_fields(
                                     target_vertex
                                 )
                             ),
@@ -323,7 +323,7 @@ class SchemaSanitizer:
                         field_index_mappings[vertex_name][old_fields[0]] = new_fields[0]
 
             # Update vertex index and fields
-            vertex = schema.graph.vertex_config[vertex_name]
+            vertex = schema.core_schema.vertex_config[vertex_name]
             existing_field_names = {f.name for f in vertex.fields}
 
             # Add new fields that don't exist

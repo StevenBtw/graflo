@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field as PydanticField, model_validator, ConfigDict
+from pydantic import AliasChoices, Field as PydanticField, model_validator, ConfigDict
 
 from graflo.architecture.base import ConfigBaseModel
 from graflo.architecture.bindings import Bindings
@@ -18,7 +18,10 @@ class GraphManifest(ConfigBaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     graph_schema: Schema | None = PydanticField(
-        default=None, description="Logical graph schema contract.", alias="schema"
+        default=None,
+        description="Logical graph schema contract.",
+        validation_alias=AliasChoices("schema", "graph_schema"),
+        serialization_alias="schema",
     )
     ingestion_model: IngestionModel | None = PydanticField(
         default=None,
@@ -58,7 +61,7 @@ class GraphManifest(ConfigBaseModel):
             self.graph_schema.finish_init()
         if self.graph_schema is not None and self.ingestion_model is not None:
             self.ingestion_model.finish_init(
-                self.graph_schema.graph,
+                self.graph_schema.core_schema,
                 strict_references=strict_references,
                 dynamic_edge_feedback=dynamic_edge_feedback,
             )

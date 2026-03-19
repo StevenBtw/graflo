@@ -21,8 +21,7 @@ Example:
 """
 
 from .database_features import DatabaseProfile
-from .db_aware import EdgeConfigDBAware, SchemaDBAware, VertexConfigDBAware
-from .edge import Edge, EdgeConfig
+from graflo.architecture.schema.edge import Edge, EdgeConfig
 from .executor import ActorExecutor
 from .bindings import (
     Bindings,
@@ -37,8 +36,16 @@ from .onto import Index
 from .resource import Resource
 from .manifest import GraphManifest
 from .ingestion_model import IngestionModel
-from .schema import GraphMetadata, GraphModel, Schema
-from .vertex import FieldType, Vertex, VertexConfig
+from .schema import (
+    CoreSchema,
+    EdgeConfigDBAware,
+    GraphMetadata,
+    GraphModel,
+    Schema,
+    SchemaDBAware,
+    VertexConfigDBAware,
+)
+from graflo.architecture.schema.vertex import FieldType, Vertex, VertexConfig
 
 __all__ = [
     "Edge",
@@ -49,6 +56,7 @@ __all__ = [
     "ActorExecutor",
     "GraphMetadata",
     "DatabaseProfile",
+    "CoreSchema",
     "GraphModel",
     "GraphManifest",
     "IngestionModel",

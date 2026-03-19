@@ -12,7 +12,7 @@ from graflo.architecture.resource import Resource
 from graflo.architecture.transform import ProtoTransform
 
 if TYPE_CHECKING:
-    from graflo.architecture.schema import GraphModel
+    from graflo.architecture.schema import CoreSchema
 
 
 class IngestionModel(ConfigBaseModel):
@@ -31,7 +31,7 @@ class IngestionModel(ConfigBaseModel):
     _transforms: dict[str, ProtoTransform] = PrivateAttr(default_factory=dict)
 
     @model_validator(mode="after")
-    def _init_model(self) -> "IngestionModel":
+    def _init_model(self) -> IngestionModel:
         """Build transform and resource lookup maps."""
         self._rebuild_runtime_state()
         return self
@@ -68,7 +68,7 @@ class IngestionModel(ConfigBaseModel):
 
     def finish_init(
         self,
-        graph: "GraphModel",
+        core_schema: CoreSchema,
         *,
         strict_references: bool = False,
         dynamic_edge_feedback: bool = False,
@@ -77,8 +77,8 @@ class IngestionModel(ConfigBaseModel):
         self._rebuild_runtime_state()
         for r in self.resources:
             r.finish_init(
-                vertex_config=graph.vertex_config,
-                edge_config=graph.edge_config,
+                vertex_config=core_schema.vertex_config,
+                edge_config=core_schema.edge_config,
                 transforms=self._transforms,
                 strict_references=strict_references,
                 dynamic_edge_feedback=dynamic_edge_feedback,
@@ -116,11 +116,13 @@ class IngestionModel(ConfigBaseModel):
         return _current_resource
 
     def prune_to_graph(
-        self, graph: "GraphModel", disconnected: set[str] | None = None
+        self, core_schema: CoreSchema, disconnected: set[str] | None = None
     ) -> None:
         """Drop resource actors that reference disconnected vertices."""
         if disconnected is None:
-            disconnected = graph.vertex_config.vertex_set - graph.edge_config.vertices
+            disconnected = (
+                core_schema.vertex_config.vertex_set - core_schema.edge_config.vertices
+            )
         if not disconnected:
             return
 

@@ -435,7 +435,7 @@ class Caster:
         self.schema.db_profile.db_flavor = db_flavor
         self.schema.finish_init()
         self.ingestion_model.finish_init(
-            self.schema.graph,
+            self.schema.core_schema,
             strict_references=ingestion_params.strict_references,
             dynamic_edge_feedback=ingestion_params.dynamic_edges,
         )

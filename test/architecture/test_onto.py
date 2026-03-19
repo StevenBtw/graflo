@@ -1,5 +1,5 @@
 from graflo.architecture.actor import ActorInitContext, ActorWrapper
-from graflo.architecture.edge import EdgeConfig
+from graflo.architecture.schema.edge import EdgeConfig
 from graflo.architecture.executor import ActorExecutor
 from graflo.architecture.onto import (
     AssemblyContext,
@@ -9,7 +9,7 @@ from graflo.architecture.onto import (
     ProvenancePath,
     TransformPayload,
 )
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 
 
 def test_provenance_path_from_lindex():

@@ -38,12 +38,12 @@ from requests import exceptions as requests_exceptions
 # Removed pyTigerGraph dependency - using direct REST API calls instead
 
 
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.architecture.database_features import DatabaseProfile
-from graflo.architecture.db_aware import VertexConfigDBAware
+from graflo.architecture.schema import VertexConfigDBAware
 from graflo.architecture.onto import Index
 from graflo.architecture.schema import Schema
-from graflo.architecture.vertex import FieldType, Vertex, VertexConfig
+from graflo.architecture.schema.vertex import FieldType, Vertex, VertexConfig
 from graflo.db.conn import Connection, SchemaExistsError
 from graflo.db.connection import TigergraphConfig
 from graflo.db.tigergraph.onto import (
@@ -1768,7 +1768,7 @@ class TigerGraphConnection(Connection):
         # If an indexed field is not in weights.direct, we need to add it.
         # Initialize weights if not present
         if edge.weights is None:
-            from graflo.architecture.edge import WeightConfig, Field
+            from graflo.architecture.schema.edge import WeightConfig, Field
 
             edge.weights = WeightConfig()
 
@@ -1784,7 +1784,7 @@ class TigerGraphConnection(Connection):
         for field_name in indexed_field_names:
             if field_name not in existing_weight_names:
                 # Add the field to weights with STRING type (default)
-                from graflo.architecture.edge import Field
+                from graflo.architecture.schema.edge import Field
 
                 edge.weights.direct.append(
                     Field(name=field_name, type=FieldType.STRING)
@@ -1886,7 +1886,7 @@ class TigerGraphConnection(Connection):
 
         # Ensure indexed fields are in weights (same logic as _get_edge_add_statement)
         if first_edge.weights is None:
-            from graflo.architecture.edge import WeightConfig
+            from graflo.architecture.schema.edge import WeightConfig
 
             first_edge.weights = WeightConfig()
 
@@ -1898,7 +1898,7 @@ class TigerGraphConnection(Connection):
 
         for field_name in indexed_field_names:
             if field_name not in existing_weight_names:
-                from graflo.architecture.edge import Field
+                from graflo.architecture.schema.edge import Field
 
                 first_edge.weights.direct.append(
                     Field(name=field_name, type=FieldType.STRING)
@@ -2064,8 +2064,8 @@ class TigerGraphConnection(Connection):
         # Validate graph name
         _validate_tigergraph_schema_name(graph_name, "graph")
 
-        vertex_config = schema.graph.vertex_config
-        edge_config = schema.graph.edge_config
+        vertex_config = schema.core_schema.vertex_config
+        edge_config = schema.core_schema.edge_config
         db_schema = schema.resolve_db_aware(DBType.TIGERGRAPH)
 
         vertex_stmts = []
@@ -4238,8 +4238,8 @@ class TigerGraphConnection(Connection):
     def define_indexes(self, schema: Schema):
         """Define all indexes from schema."""
         try:
-            self.define_vertex_indexes(schema.graph.vertex_config, schema=schema)
-            edges_for_indexes = list(schema.graph.edge_config.values())
+            self.define_vertex_indexes(schema.core_schema.vertex_config, schema=schema)
+            edges_for_indexes = list(schema.core_schema.edge_config.values())
             self.define_edge_indexes(edges_for_indexes, schema=schema)
         except Exception as e:
             logger.error(f"Error defining indexes: {e}")
