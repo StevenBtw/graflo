@@ -11,10 +11,10 @@ import asyncio
 import logging
 from uuid import uuid4
 
-from graflo.architecture.edge import Edge
-from graflo.architecture.db_aware import EdgeRuntime, SchemaDBAware
-from graflo.architecture.ingestion_model import IngestionModel
-from graflo.architecture.onto import GraphContainer
+from graflo.architecture.schema.edge import Edge
+from graflo.architecture.schema import EdgeRuntime, SchemaDBAware
+from graflo.architecture.contract.declarations.ingestion_model import IngestionModel
+from graflo.architecture.graph_types import GraphContainer
 from graflo.architecture.schema import Schema
 from graflo.db import ConnectionManager
 from graflo.db import DBConfig
@@ -66,7 +66,7 @@ class DBWriter:
         """
         self.schema.finish_init()
         self.ingestion_model.finish_init(
-            self.schema.graph,
+            self.schema.core_schema,
             dynamic_edge_feedback=self.dynamic_edges,
         )
         self._schema_db_aware = self.schema.resolve_db_aware(conn_conf.connection_type)
@@ -140,7 +140,7 @@ class DBWriter:
         """Extend edge lists for blank vertices after their keys are resolved."""
         vc = self._require_db_aware().vertex_config
         for vcol in vc.blank_vertices:
-            for edge_id, _edge in self.schema.graph.edge_config.items():
+            for edge_id, _edge in self.schema.core_schema.edge_config.items():
                 vfrom, vto, _relation = edge_id
                 if vcol == vfrom or vcol == vto:
                     if vfrom not in gc.vertices or vto not in gc.vertices:
@@ -257,7 +257,7 @@ class DBWriter:
         await asyncio.gather(
             *[
                 _push_one(edge_id, edge)
-                for edge_id, edge in self.schema.graph.edge_config.items()
+                for edge_id, edge in self.schema.core_schema.edge_config.items()
             ]
         )
 

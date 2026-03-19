@@ -490,8 +490,8 @@ print("\n" + "=" * 80)
 print("Ingestion complete!")
 print("=" * 80)
 print(f"Schema: {schema.metadata.name}")
-print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.graph.edge_config.values()))}")
+print(f"Vertices: {len(schema.core_schema.vertex_config.vertices)}")
+print(f"Edges: {len(list(schema.core_schema.edge_config.values()))}")
 print(f"Resources: {len(ingestion_model.resources)}")
 print("=" * 80)
 
@@ -740,7 +740,7 @@ ingestion_model = manifest.require_ingestion_model()
 
 # Modify schema as needed
 # Add custom transforms, filters, or additional edges
-schema.graph.vertex_config.vertices[0].filters.append(...)
+schema.core_schema.vertex_config.vertices[0].filters.append(...)
 
 # Use modified schema
 caster = Caster(schema=schema, ingestion_model=ingestion_model)
@@ -751,7 +751,7 @@ caster = Caster(schema=schema, ingestion_model=ingestion_model)
 You can also create bindings manually for more control:
 
 ```python
-from graflo.architecture.bindings import Bindings, TableConnector
+from graflo.architecture.contract.bindings import Bindings, TableConnector
 
 bindings = Bindings(
     _resource_mapping={

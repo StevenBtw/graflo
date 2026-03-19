@@ -12,13 +12,13 @@ import os
 
 from sqlalchemy import create_engine, text
 
-from graflo.architecture.ingestion_model import IngestionModel
+from graflo.architecture.contract.declarations.ingestion_model import IngestionModel
 from graflo.architecture.schema import Schema
 from graflo.data_source.sql import SQLConfig, SQLDataSource
 from graflo.filter.onto import ComparisonOperator, FilterExpression
-from graflo.architecture.bindings import TableConnector
+from graflo.architecture.contract.bindings import TableConnector
 from graflo.hq.auto_join import enrich_edge_connector_with_joins
-from graflo.architecture.bindings import Bindings
+from graflo.architecture.contract.bindings import Bindings
 
 _INGESTION_BY_SCHEMA_ID: dict[int, IngestionModel] = {}
 
@@ -40,7 +40,7 @@ def _build_bound_schema(
     schema = Schema.model_validate(
         {
             "metadata": {"name": name, "version": "0.0.1"},
-            "graph": {
+            "core_schema": {
                 "vertex_config": vertex_config,
                 "edge_config": edge_config,
             },
@@ -48,7 +48,7 @@ def _build_bound_schema(
         }
     )
     ingestion_model = IngestionModel.model_validate({"resources": resources})
-    ingestion_model.finish_init(schema.graph)
+    ingestion_model.finish_init(schema.core_schema)
     _INGESTION_BY_SCHEMA_ID[id(schema)] = ingestion_model
     return schema
 
@@ -291,7 +291,7 @@ class TestEdgeResourceAutoJoin:
             resource=resource,
             connector=tp_edge,
             bindings=patterns,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         q = tp_edge.build_query("main")
@@ -304,7 +304,7 @@ class TestEdgeResourceAutoJoin:
     def test_auto_join_query_executes_on_sqlite(self):
         """Run the generated JOIN query against a real SQLite DB."""
         from graflo.hq.auto_join import enrich_edge_connector_with_joins
-        from graflo.architecture.bindings import Bindings
+        from graflo.architecture.contract.bindings import Bindings
 
         conn_str = _setup_db()
         schema = self._build_schema()
@@ -323,7 +323,7 @@ class TestEdgeResourceAutoJoin:
             resource=resource,
             connector=tp_edge,
             bindings=bindings,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         # SQLite doesn't use schema prefixes, so build query manually
@@ -366,7 +366,7 @@ class TestEdgeResourceAutoJoin:
 
     def test_pipeline_contains_vertex_router_actors(self):
         """Pipeline with vertex_router steps produces VertexRouterActor instances."""
-        from graflo.architecture.actor import VertexRouterActor
+        from graflo.architecture.pipeline.runtime.actor import VertexRouterActor
 
         schema = self._build_schema()
         resource = _bound_ingestion_model(schema).fetch_resource("relations")
@@ -385,8 +385,10 @@ class TestEdgeResourceAutoJoin:
 
     def test_vertex_router_extract_sub_doc_strips_prefix(self):
         """VertexRouterActor._extract_sub_doc strips prefix from field keys."""
-        from graflo.architecture.actor import VertexRouterActor
-        from graflo.architecture.actor.config import VertexRouterActorConfig
+        from graflo.architecture.pipeline.runtime.actor import VertexRouterActor
+        from graflo.architecture.pipeline.runtime.actor.config import (
+            VertexRouterActorConfig,
+        )
 
         config = VertexRouterActorConfig(type_field="s__class_name", prefix="s__")
         router = VertexRouterActor(config)
@@ -414,8 +416,10 @@ class TestEdgeResourceAutoJoin:
 
     def test_vertex_router_extract_sub_doc_with_field_map(self):
         """VertexRouterActor._extract_sub_doc applies field_map when set."""
-        from graflo.architecture.actor import VertexRouterActor
-        from graflo.architecture.actor.config import VertexRouterActorConfig
+        from graflo.architecture.pipeline.runtime.actor import VertexRouterActor
+        from graflo.architecture.pipeline.runtime.actor.config import (
+            VertexRouterActorConfig,
+        )
 
         config = VertexRouterActorConfig(
             type_field="src_type",
@@ -468,7 +472,7 @@ class TestEdgeResourceAutoJoin:
 
     def test_vertex_router_registers_wrappers_lazily(self):
         """VertexRouterActor creates only wrappers used by routed documents."""
-        from graflo.architecture.actor import VertexRouterActor
+        from graflo.architecture.pipeline.runtime.actor import VertexRouterActor
 
         schema = self._build_schema()
         resource = _bound_ingestion_model(schema).fetch_resource("relations")

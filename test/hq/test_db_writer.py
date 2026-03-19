@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import asyncio
 
-from graflo.architecture.edge import Edge, EdgeConfig
+from graflo.architecture.schema.edge import Edge, EdgeConfig
 from graflo.architecture.database_features import DatabaseProfile
-from graflo.architecture.ingestion_model import IngestionModel
-from graflo.architecture.onto import GraphContainer
+from graflo.architecture.contract.declarations.ingestion_model import IngestionModel
+from graflo.architecture.graph_types import GraphContainer
 from graflo.architecture.schema import (
+    CoreSchema,
     GraphMetadata,
-    GraphModel,
     Schema,
 )
-from graflo.architecture.vertex import Vertex, VertexConfig, Field
+from graflo.architecture.schema.vertex import Vertex, VertexConfig, Field
 from graflo.db.connection import ArangoConfig
 from graflo.hq.db_writer import DBWriter
 from graflo.onto import DBType
@@ -52,7 +52,7 @@ def _build_schema() -> Schema:
     edge_config = EdgeConfig(edges=[Edge(source="blank_v", target="target_v")])
     schema = Schema(
         metadata=GraphMetadata(name="test"),
-        graph=GraphModel(vertex_config=vertex_config, edge_config=edge_config),
+        core_schema=CoreSchema(vertex_config=vertex_config, edge_config=edge_config),
         db_profile=DatabaseProfile(db_flavor=DBType.NEO4J),
     )
     return schema
@@ -60,7 +60,7 @@ def _build_schema() -> Schema:
 
 def _build_ingestion_model(schema: Schema) -> IngestionModel:
     ingestion_model = IngestionModel(resources=[])
-    ingestion_model.finish_init(schema.graph)
+    ingestion_model.finish_init(schema.core_schema)
     return ingestion_model
 
 

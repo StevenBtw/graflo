@@ -13,13 +13,7 @@ Instead of manually writing a YAML schema, this example shows how to:
 ## Requirements
 
 - A target graph database running (ArangoDB, Neo4j, TigerGraph, or FalkorDB)
-- The `sparql` extra installed:
-
-```bash
-pip install graflo[sparql]
-```
-
-This pulls in `rdflib` (for local RDF file parsing) and `SPARQLWrapper` (for remote SPARQL endpoints).
+- GraFlo installed (`pip install graflo` or `uv add graflo`). RDF/SPARQL stacks (`rdflib`, `SPARQLWrapper`) are **core** dependencies—no separate extra is required.
 
 ## Dataset: Academic Knowledge Graph
 
@@ -194,7 +188,7 @@ ingestion_model:
 Instead of calling `engine.create_bindings_from_rdf()` (which does this automatically), we construct each `SparqlConnector` by hand. This gives full control over which `rdf:Class` URI maps to which resource and which file (or endpoint) provides the data:
 
 ```python
-from graflo.architecture.bindings import Bindings, SparqlConnector
+from graflo.architecture.contract.bindings import Bindings, SparqlConnector
 from pathlib import Path
 
 DATA_FILE = Path("data/data.ttl")
@@ -258,7 +252,7 @@ Finally, define the graph schema in the target database and ingest the data in o
 
 ```python
 from graflo.hq import IngestionParams
-from graflo.architecture.manifest import GraphManifest
+from graflo.architecture.contract.manifest import GraphManifest
 
 engine.define_and_ingest(
     manifest=GraphManifest(
@@ -288,8 +282,8 @@ from pathlib import Path
 
 from graflo.db.connection.onto import ArangoConfig
 from graflo.hq import GraphEngine, IngestionParams
-from graflo.architecture.manifest import GraphManifest
-from graflo.architecture.bindings import Bindings, SparqlConnector
+from graflo.architecture.contract.manifest import GraphManifest
+from graflo.architecture.contract.bindings import Bindings, SparqlConnector
 
 logging.basicConfig(level=logging.WARNING, handlers=[logging.StreamHandler()])
 logging.getLogger("graflo").setLevel(logging.DEBUG)
@@ -334,8 +328,8 @@ engine.define_and_ingest(
 )
 
 print(f"Schema: {schema.metadata.name}")
-print(f"Vertices: {len(schema.graph.vertex_config.vertices)}")
-print(f"Edges: {len(list(schema.graph.edge_config.values()))}")
+print(f"Vertices: {len(schema.core_schema.vertex_config.vertices)}")
+print(f"Edges: {len(list(schema.core_schema.edge_config.values()))}")
 print(f"Resources: {len(ingestion_model.resources)}")
 ```
 

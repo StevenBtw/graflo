@@ -4,9 +4,9 @@
 
 This page documents the transform DSL as implemented in:
 
-- `graflo.architecture.transform.Transform`
-- `graflo.architecture.actor.transform.TransformActor`
-- `graflo.architecture.actor.config.models.TransformCallConfig`
+- `graflo.architecture.contract.declarations.transform.Transform`
+- `graflo.architecture.pipeline.runtime.actor.transform.TransformActor`
+- `graflo.architecture.pipeline.runtime.actor.config.models.TransformCallConfig`
 
 ## Mental model
 
@@ -65,7 +65,24 @@ resources:
 
 ### Local override of reusable transform
 
-A `call.use` step can override `input`, `output`, and/or `params` for local context while reusing the base function (`module` + `foo`):
+A `call.use` step can override `input`, `output`, `params`, and/or `dress` while reusing `module` + `foo` from the vocabulary entry. Put shared `dress` and `params` on the named transform when several steps only differ by `input`:
+
+```yaml
+# ingestion_model.transforms
+- name: round_metric
+  module: graflo.util.transform
+  foo: round_str
+  params: {ndigits: 3}
+  dress: {key: name, value: value}
+
+# resource apply
+- transform:
+    call: {use: round_metric, input: [Open]}
+- transform:
+    call: {use: round_metric, input: [Close]}
+```
+
+Rename-style override (same idea, different fields):
 
 ```yaml
 - transform:
@@ -145,9 +162,33 @@ value: 17.9
 
 ## Multi-field transforms
 
+### Grouped calls (`input_groups` / `output_groups`)
+
+Use **groups** when the same function should run multiple times on different argument tuples (not the same as `strategy: each`, which runs once per *single* input field from a flat `input` list).
+
+- Each inner group is a list of field names whose values are read from the document and passed as `*args` to the function for that call.
+- The function is invoked **once per group**, in order.
+- **`output`**: list of field names, one per group, when each call returns a single value.
+- **`output_groups`**: list of field-name lists, parallel to `input_groups`, when each call returns multiple values (e.g. a tuple mapped to several outputs).
+- **Omitting outputs**: only valid when every group has exactly **one** input field; results are written back to those same keys (passthrough). If any group has more than one field, you must set `output` or `output_groups`.
+
+YAML accepts a **shorthand** for unary groups: a group can be a single string, and `input_groups` can be a list of strings (one field per group):
+
+```yaml
+- transform:
+    call:
+      module: builtins
+      foo: int
+      input_groups:
+        - age_parent
+        - age_child
+```
+
+Grouped mode is incompatible with `dress` and with `strategy: each` or `strategy: all`. Omit `strategy` or use `single` (default).
+
 ### Strategy: `single` (default)
 
-Call function once with all selected input values.
+Call function once with all selected input values (flat `input`, no groups).
 
 ```yaml
 - transform:
@@ -156,6 +197,50 @@ Call function once with all selected input values.
       foo: parse_date_ibes
       input: [ANNDATS, ANNTIMS]
       output: datetime_announce
+```
+
+### Explicit grouped calls (nested field lists)
+
+When the same function should run repeatedly on explicit argument tuples, use
+nested lists in `input_groups` (see [Grouped calls](#grouped-calls-input_groups--output_groups) above).
+
+```yaml
+- transform:
+    call:
+      module: my_pkg.transforms
+      foo: join_name
+      input_groups:
+        - [fname_parent, lname_parent]
+        - [fname_child, lname_child]
+      output: [parent_name, child_name]
+```
+
+`input_groups` can also use grouped outputs:
+
+```yaml
+- transform:
+    call:
+      module: my_pkg.transforms
+      foo: split_name
+      input_groups:
+        - [parent_name]
+        - [child_name]
+      output_groups:
+        - [parent_fname, parent_lname]
+        - [child_fname, child_lname]
+```
+
+Grouped passthrough is supported when outputs are omitted and each group maps
+back to its own keys (for example unary casts):
+
+```yaml
+- transform:
+    call:
+      module: builtins
+      foo: int
+      input_groups:
+        - [age_parent]
+        - [age_child]
 ```
 
 ### Strategy: `each`
@@ -229,6 +314,7 @@ Example with include:
 
 - requires a function transform
 - does not allow `input`, `output`, or `dress`
+- does not allow `input_groups` or `output_groups`
 - does not allow explicit `strategy` (key mode is implicit per-key execution)
 - transformed keys must remain unique (collisions raise an error)
 
@@ -247,7 +333,9 @@ Example with include:
 - `params: dict` - keyword args passed to function
 - `input: str | list[str] | null` - input fields (not used for key mode)
 - `output: str | list[str] | null` - output fields (not used for key mode)
-- `strategy: single | each | all | null` - function execution mode
+- `input_groups: list[list[str]] | null` — grouped calls (values mode only); each entry is a group. YAML may use a **list of strings** as shorthand for unary groups (one field name per group).
+- `output_groups: list[list[str]] | null` - grouped outputs aligned to `input_groups`
+- `strategy: single | each | all | null` - function execution mode (with `input_groups`, omit or use `single` only; `each` / `all` are rejected)
 - `target: values | keys` - operate on values (default) or keys
 - `keys`:
   - `mode: all | include | exclude`
@@ -255,6 +343,12 @@ Example with include:
 - `dress`:
   - `key: str`
   - `value: str`
+
+### `Transform` (Python API only)
+
+Named transforms in `ingestion_model.transforms` are `ProtoTransform` entries (`module`, `foo`, `params`, flat/grouped `input` / `output`, `dress`). Inline `transform.call` steps supply execution options (`target`, `keys`, `strategy`) and may override IO; `TransformActor` assembles a runtime `Transform`, which adds:
+
+- `passthrough_group_output: bool` (default `true`) — when `input_groups` is used and neither `output` nor `output_groups` is set, allow writing unary group results back onto the input keys. Not exposed on manifest `transform.call` today; omit outputs in YAML only for unary groups.
 
 ## Validation and compatibility rules
 
@@ -264,6 +358,12 @@ Example with include:
 - `call.use` cannot be combined with `call.module` or `call.foo`.
 - If `call.use` is absent, both `call.module` and `call.foo` are required.
 - `map`/rename and function mode are mutually exclusive.
+- Use either `call.input` or `call.input_groups`, not both.
+- With `call.input_groups`, do not set `call.strategy` to `each` or `all`.
+- For grouped calls, use either `call.output` (one output per input group) or
+  `call.output_groups` (full per-group output tuples), not both.
+- `call.output_groups` must have the same number of groups as `call.input_groups`.
+- Passthrough (no `output` / `output_groups`) requires every group to contain exactly one input field.
 - Legacy `switch` is not supported.
 - List-style `dress` is not supported (`dress` must be a dict with `key` and `value`).
 
@@ -277,12 +377,12 @@ Example with include:
   - repeated casting logic
 - Use local overrides when:
   - same function, different input/output fields per resource
-- Use `strategy: each` for repeated unary casting (for example, multiple numeric columns).
+- Use `strategy: each` with a flat `input` list for repeated unary casting (for example, multiple numeric columns). For the same callable over **different argument tuples**, use `input_groups` instead.
 - Use `dress` to pivot wide metrics into tidy key/value records before routing into vertices/edges.
 
 ## Related docs
 
 - [Concepts Overview](index.md)
 - [Creating a Manifest](../getting_started/creating_manifest.md)
-- [Architecture Transform API](../reference/architecture/transform.md)
-- [Transform Actor API](../reference/architecture/actor/transform.md)
+- [Architecture Transform API](../reference/architecture/contract/declarations/transform.md)
+- [Transform Actor API](../reference/architecture/pipeline/runtime/actor/transform.md)

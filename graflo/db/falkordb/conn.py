@@ -31,10 +31,10 @@ from urllib.parse import urlparse
 from falkordb import FalkorDB
 from falkordb.graph import Graph
 
-from graflo.architecture.edge import Edge
-from graflo.architecture.onto import Index
+from graflo.architecture.schema.edge import Edge
+from graflo.architecture.graph_types import Index
 from graflo.architecture.schema import Schema
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema.vertex import VertexConfig
 from graflo.db.conn import Connection, SchemaExistsError
 from graflo.db.util import serialize_value
 from graflo.filter.onto import FilterExpression

@@ -8,10 +8,10 @@ import pytest
 import yaml
 from suthing import FileHandle, equals
 
-from graflo.architecture.manifest import GraphManifest
+from graflo.architecture.contract.manifest import GraphManifest
 from graflo.architecture.util import cast_graph_name_to_triple
 from graflo.util.misc import sorted_dicts
-from graflo.architecture.bindings import Bindings, FileConnector
+from graflo.architecture.contract.bindings import Bindings, FileConnector
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def ingest_atomic(conn_conf, current_path, test_db_name, schema_o, mode, n_cores
     ingestion_model = fetch_manifest_obj(
         mode, dynamic_edge_feedback=True
     ).require_ingestion_model()
-    ingestion_model.finish_init(schema_o.graph, dynamic_edge_feedback=True)
+    ingestion_model.finish_init(schema_o.core_schema, dynamic_edge_feedback=True)
     for resource in ingestion_model.resources:
         resource_name = resource.name
         # Create a FileConnector that matches files for this resource

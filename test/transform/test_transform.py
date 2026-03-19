@@ -2,7 +2,12 @@ import logging
 
 import pytest
 
-from graflo.architecture.transform import KeySelectionConfig, Transform
+from graflo.architecture.contract.declarations.transform import (
+    DressConfig,
+    KeySelectionConfig,
+    ProtoTransform,
+    Transform,
+)
 from graflo.util.transform import (
     camel_to_snake,
     parse_multi_item,
@@ -143,6 +148,17 @@ def test_dress_derives_output():
     assert t.dress.value == "value"
 
 
+def test_proto_transform_dress_derives_output() -> None:
+    pt = ProtoTransform(
+        name="int_metric",
+        module="builtins",
+        foo="int",
+        dress=DressConfig(key="name", value="value"),
+    )
+    assert pt.output == ("name", "value")
+    assert pt.dress is not None
+
+
 def test_switch_legacy_rejected():
     kwargs = {
         "module": "builtins",
@@ -281,4 +297,56 @@ def test_target_keys_rejects_explicit_strategy():
             foo="camel_to_snake",
             target="keys",
             strategy="each",
+        )
+
+
+def test_input_groups_scalar_outputs():
+    t = Transform(
+        module="operator",
+        foo="add",
+        input_groups=(("x1", "y1"), ("x2", "y2")),
+        output=("s1", "s2"),
+    )
+    r = t({"x1": "Ada ", "y1": "Lovelace", "x2": "Alan ", "y2": "Turing"})
+    assert r == {"s1": "Ada Lovelace", "s2": "Alan Turing"}
+
+
+def test_input_groups_output_groups():
+    t = Transform(
+        module="builtins",
+        foo="divmod",
+        input_groups=(("a", "b"), ("c", "d")),
+        output_groups=(("q1", "r1"), ("q2", "r2")),
+    )
+    r = t({"a": 10, "b": 3, "c": 20, "d": 6})
+    assert r == {"q1": 3, "r1": 1, "q2": 3, "r2": 2}
+
+
+def test_input_groups_passthrough_when_output_omitted():
+    t = Transform(
+        module="builtins",
+        foo="int",
+        input_groups=(("age_parent",), ("age_child",)),
+    )
+    r = t({"age_parent": "40", "age_child": "10"})
+    assert r == {"age_parent": 40, "age_child": 10}
+
+
+def test_input_groups_rejects_strategy_each():
+    with pytest.raises(ValueError, match="does not accept strategy"):
+        Transform(
+            module="builtins",
+            foo="int",
+            input_groups=(("value",),),
+            strategy="each",
+        )
+
+
+def test_target_keys_rejects_input_groups():
+    with pytest.raises(ValueError, match="does not accept input_groups"):
+        Transform(
+            module="graflo.util.transform",
+            foo="camel_to_snake",
+            target="keys",
+            input_groups=(("raw_id",),),
         )

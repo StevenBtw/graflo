@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import networkx as nx
 import pytest
 
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.plot.plotter import ManifestPlotter
 
 
@@ -74,7 +74,7 @@ def _build_plotter(
     plotter.prefix = "test_schema"
     plotter.schema = SimpleNamespace(
         metadata=SimpleNamespace(name="test_schema"),
-        graph=SimpleNamespace(
+        core_schema=SimpleNamespace(
             edge_config=_EdgeConfigStub(configured_edges),
             vertex_config=_VertexConfigStub(
                 vertex_set=vertex_set,

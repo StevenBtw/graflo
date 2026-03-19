@@ -1,6 +1,6 @@
 """Unit tests for NebulaGraph utility functions (no Docker required)."""
 
-from graflo.architecture.vertex import FieldType
+from graflo.architecture.schema.vertex import FieldType
 from graflo.db.nebula.util import (
     escape_nebula_string,
     make_vid,

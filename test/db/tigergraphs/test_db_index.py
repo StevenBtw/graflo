@@ -13,7 +13,7 @@ def test_create_vertex_index(conn_conf, schema_obj, test_graph_name):
 
         # Define vertex indexes (indexes should be created in init_db, but call explicitly)
         db_client.define_vertex_indexes(
-            schema_obj.graph.vertex_config, schema=schema_obj
+            schema_obj.core_schema.vertex_config, schema=schema_obj
         )
 
     # Verify indexes were created by attempting to create them again

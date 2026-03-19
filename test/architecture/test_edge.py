@@ -2,11 +2,11 @@ import logging
 
 import pytest
 
-from graflo.architecture.edge import Edge, EdgeConfig
+from graflo.architecture.schema.edge import Edge, EdgeConfig
 from graflo.architecture.database_features import DatabaseProfile
-from graflo.architecture.db_aware import EdgeConfigDBAware, VertexConfigDBAware
-from graflo.architecture.onto import Weight
-from graflo.architecture.vertex import VertexConfig
+from graflo.architecture.schema import EdgeConfigDBAware, VertexConfigDBAware
+from graflo.architecture.graph_types import Weight
+from graflo.architecture.schema.vertex import VertexConfig
 from graflo.onto import DBType
 
 logger = logging.getLogger(__name__)

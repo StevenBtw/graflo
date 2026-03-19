@@ -7,7 +7,7 @@ def _schema_v1() -> Schema:
     return Schema.from_dict(
         {
             "metadata": {"name": "kg", "version": "1.0.0"},
-            "graph": {
+            "core_schema": {
                 "vertex_config": {
                     "vertices": [
                         {
@@ -43,7 +43,7 @@ def _schema_v2() -> Schema:
     return Schema.from_dict(
         {
             "metadata": {"name": "kg", "version": "1.1.0"},
-            "graph": {
+            "core_schema": {
                 "vertex_config": {
                     "vertices": [
                         {

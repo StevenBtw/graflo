@@ -23,7 +23,7 @@ import pytest
 from graflo.onto import DBType
 from test.conftest import fetch_manifest_obj
 from graflo.hq.sanitizer import SchemaSanitizer
-from graflo.architecture.manifest import GraphManifest
+from graflo.architecture.contract.manifest import GraphManifest
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def test_vertex_name_sanitization_for_tigergraph(schema_with_reserved_words):
 
     vertex_dbnames = [
         sanitized_schema.db_profile.vertex_storage_name(v.name)
-        for v in sanitized_schema.graph.vertex_config.vertices
+        for v in sanitized_schema.core_schema.vertex_config.vertices
     ]
     assert "Package_vertex" in vertex_dbnames, (
         f"Expected 'package_vertex' in vertices after sanitization, got {vertex_dbnames}"
@@ -82,10 +82,12 @@ def test_edges_sanitization_for_tigergraph(schema_with_incompatible_edges):
         "container_name": "id"
     }
 
-    assert sanitized_schema.graph.vertex_config.vertices[-1].fields[0].name == "id"
-    assert sanitized_schema.graph.vertex_config.vertices[-1].identity[0] == "id"
-    edge_a = sanitized_schema.graph.edge_config.edges[-2]
-    edge_b = sanitized_schema.graph.edge_config.edges[-1]
+    assert (
+        sanitized_schema.core_schema.vertex_config.vertices[-1].fields[0].name == "id"
+    )
+    assert sanitized_schema.core_schema.vertex_config.vertices[-1].identity[0] == "id"
+    edge_a = sanitized_schema.core_schema.edge_config.edges[-2]
+    edge_b = sanitized_schema.core_schema.edge_config.edges[-1]
     assert (
         sanitized_schema.db_profile.edge_relation_name(
             edge_a.edge_id,

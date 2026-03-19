@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from graflo.filter.onto import ComparisonOperator, FilterExpression, LogicalOperator
 from graflo.onto import ExpressionFlavor
-from graflo.architecture.bindings import JoinClause, TableConnector
+from graflo.architecture.contract.bindings import JoinClause, TableConnector
 
 
 # ---------------------------------------------------------------
@@ -273,14 +273,16 @@ class TestAutoJoin:
 
     def _make_schema_and_patterns(self):
         """Build a minimal Schema + Connectors for the CMDB-like scenario."""
-        from graflo.architecture.ingestion_model import IngestionModel
+        from graflo.architecture.contract.declarations.ingestion_model import (
+            IngestionModel,
+        )
         from graflo.architecture.schema import Schema
-        from graflo.architecture.bindings import Bindings
+        from graflo.architecture.contract.bindings import Bindings
 
         schema = Schema.model_validate(
             {
                 "metadata": {"name": "test", "version": "0.0.1"},
-                "graph": {
+                "core_schema": {
                     "vertex_config": {
                         "vertices": [
                             {"name": "server", "fields": ["id", "class_name"]},
@@ -315,7 +317,7 @@ class TestAutoJoin:
                 ]
             }
         )
-        ingestion_model.finish_init(schema.graph)
+        ingestion_model.finish_init(schema.core_schema)
 
         patterns = Bindings(
             table_connectors={
@@ -339,7 +341,7 @@ class TestAutoJoin:
             resource=resource,
             connector=connector,
             bindings=bindings,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         assert len(connector.joins) == 2
@@ -360,7 +362,7 @@ class TestAutoJoin:
             resource=resource,
             connector=connector,
             bindings=bindings,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         assert len(connector.filters) == 2
@@ -380,7 +382,7 @@ class TestAutoJoin:
             resource=resource,
             connector=connector,
             bindings=bindings,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         # Should not have modified the existing join
@@ -398,7 +400,7 @@ class TestAutoJoin:
             resource=resource,
             connector=connector,
             bindings=bindings,
-            vertex_config=schema.graph.vertex_config,
+            vertex_config=schema.core_schema.vertex_config,
         )
 
         q = connector.build_query("sn")

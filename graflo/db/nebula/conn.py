@@ -9,10 +9,10 @@ from __future__ import annotations
 import logging
 from typing import Any, ClassVar
 
-from graflo.architecture.edge import Edge
-from graflo.architecture.onto import Index
+from graflo.architecture.schema.edge import Edge
+from graflo.architecture.graph_types import Index
 from graflo.architecture.schema import Schema
-from graflo.architecture.vertex import FieldType, VertexConfig
+from graflo.architecture.schema.vertex import FieldType, VertexConfig
 from graflo.db.conn import Connection, SchemaExistsError
 from graflo.db.nebula.adapter import (
     NebulaClientAdapter,
@@ -259,19 +259,19 @@ class NebulaConnection(Connection):
 
     def define_schema(self, schema: Schema) -> None:
         self.define_vertex_classes(schema)
-        edges = list(schema.graph.edge_config.values())
+        edges = list(schema.core_schema.edge_config.values())
         self.define_edge_classes(edges)
 
     def define_vertex_classes(self, schema: Schema) -> None:
-        for vname in schema.graph.vertex_config.vertex_set:
-            fields = schema.graph.vertex_config.fields(vname)
+        for vname in schema.core_schema.vertex_config.vertex_set:
+            fields = schema.core_schema.vertex_config.fields(vname)
             stmt = create_tag_ngql(vname, fields)
             self._execute(stmt)
             self._tag_fields[vname] = [f.name for f in fields]
             logger.debug("Created tag '%s'", vname)
 
-        if schema.graph.vertex_config.vertex_set:
-            sample_tag = next(iter(schema.graph.vertex_config.vertex_set))
+        if schema.core_schema.vertex_config.vertex_set:
+            sample_tag = next(iter(schema.core_schema.vertex_config.vertex_set))
             self._wait_for_dml_ready(sample_tag)
 
     def define_edge_classes(self, edges: list[Edge]) -> None:
@@ -447,7 +447,7 @@ class NebulaConnection(Connection):
     # ------------------------------------------------------------------
 
     def clear_data(self, schema: Schema) -> None:
-        for vname in schema.graph.vertex_config.vertex_set:
+        for vname in schema.core_schema.vertex_config.vertex_set:
             try:
                 self._execute(
                     f"LOOKUP ON `{vname}` YIELD id(vertex) AS vid "

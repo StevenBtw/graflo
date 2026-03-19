@@ -19,7 +19,7 @@ from graflo import Bindings, GraphManifest
 from graflo.db import ArangoConfig
 from graflo.hq import GraphEngine
 from graflo.hq.caster import IngestionParams
-from graflo.architecture.bindings import FileConnector
+from graflo.architecture.contract.bindings import FileConnector
 
 manifest = GraphManifest.from_config(FileHandle.load("manifest.yaml"))
 manifest.finish_init()
@@ -60,4 +60,4 @@ engine.define_and_ingest(
 
 print("Ingestion complete!")
 print(f"Schema: {schema.metadata.name}")
-print(f"Vertices: {[v.name for v in schema.graph.vertex_config.vertices]}")
+print(f"Vertices: {[v.name for v in schema.core_schema.vertex_config.vertices]}")

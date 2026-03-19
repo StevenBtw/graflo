@@ -26,7 +26,7 @@ import networkx as nx
 from suthing import FileHandle
 
 from graflo.architecture import GraphManifest
-from graflo.architecture.actor import (
+from graflo.architecture.pipeline.runtime.actor import (
     ActorWrapper,
     DescendActor,
     EdgeActor,
@@ -569,7 +569,7 @@ class ManifestPlotter:
     def _infer_vertex_levels(self, edges: list[tuple[str, str]]) -> dict[str, int]:
         """Infer robust DAG-like levels by collapsing SCCs then layering the DAG."""
         graph = nx.DiGraph()
-        graph.add_nodes_from(self.schema.graph.vertex_config.vertex_set)
+        graph.add_nodes_from(self.schema.core_schema.vertex_config.vertex_set)
         graph.add_edges_from(edges)
 
         condensation = nx.condensation(graph)
@@ -599,9 +599,9 @@ class ManifestPlotter:
         g = nx.DiGraph()
         nodes = []
         edges = []
-        vconf = self.schema.graph.vertex_config
+        vconf = self.schema.core_schema.vertex_config
         vertex_prefix_dict = shortest_unique_prefix_map(
-            [v for v in self.schema.graph.vertex_config.vertex_set]
+            [v for v in self.schema.core_schema.vertex_config.vertex_set]
         )
 
         kwargs = {"vfield": True, "vertex_sh": vertex_prefix_dict}
@@ -677,7 +677,7 @@ class ManifestPlotter:
             [resource.name for resource in self.ingestion_model.resources]
         )
         vertex_prefix_dict = shortest_unique_prefix_map(
-            [v for v in self.schema.graph.vertex_config.vertex_set]
+            [v for v in self.schema.core_schema.vertex_config.vertex_set]
         )
         kwargs = {"vertex_sh": vertex_prefix_dict, "resource_sh": resource_prefix_dict}
 
@@ -719,7 +719,7 @@ class ManifestPlotter:
         ]
         vertex_nodes = [
             get_auxnode_id(AuxNodeType.VERTEX, vertex=v)
-            for v in sorted(self.schema.graph.vertex_config.vertex_set)
+            for v in sorted(self.schema.core_schema.vertex_config.vertex_set)
             if get_auxnode_id(AuxNodeType.VERTEX, vertex=v) in g.nodes
         ]
         if resource_nodes:
@@ -732,7 +732,7 @@ class ManifestPlotter:
     def _extract_resource_vertex_reasons(self, resource) -> dict[str, set[str]]:
         """Collect vertex references for a resource with lightweight reason labels."""
         vertex_reasons: dict[str, set[str]] = {}
-        known_vertices = set(self.schema.graph.vertex_config.vertex_set)
+        known_vertices = set(self.schema.core_schema.vertex_config.vertex_set)
         actors = resource.root.collect_actors()
 
         def _add(vertex_name: str, reason: str) -> None:
@@ -808,10 +808,10 @@ class ManifestPlotter:
         rendered_edges: list[tuple] = []
 
         discovered_edges = self._discover_edges_from_resources()
-        configured_edges = dict(self.schema.graph.edge_config.items())
+        configured_edges = dict(self.schema.core_schema.edge_config.items())
         all_edges = self._merge_edges(configured_edges, discovered_edges)
 
-        known_vertices = set(self.schema.graph.vertex_config.vertex_set)
+        known_vertices = set(self.schema.core_schema.vertex_config.vertex_set)
         valid_edges, invalid_edges = self._filter_edges_with_known_vertices(
             all_edges,
             known_vertices,
@@ -841,7 +841,7 @@ class ManifestPlotter:
             for vertex in (source, target)
         }
         all_vertices = (
-            set(self.schema.graph.vertex_config.vertex_set)
+            set(self.schema.core_schema.vertex_config.vertex_set)
             if include_all_vertices
             else vertices_in_edges
         )

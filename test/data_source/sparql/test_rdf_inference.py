@@ -6,9 +6,7 @@ from pathlib import Path
 
 import pytest
 
-rdflib = pytest.importorskip(
-    "rdflib", reason="rdflib not installed (need graflo[sparql])"
-)
+rdflib = pytest.importorskip("rdflib", reason="rdflib not installed")
 
 from graflo.hq.rdf_inferencer import RdfInferenceManager  # noqa: E402
 
@@ -21,7 +19,7 @@ class TestRdfInferenceManager:
         mgr = RdfInferenceManager()
         schema, _ = mgr.infer_schema(sample_ontology_path, schema_name="test_rdf")
 
-        vertex_names = {v.name for v in schema.graph.vertex_config.vertices}
+        vertex_names = {v.name for v in schema.core_schema.vertex_config.vertices}
         assert "Person" in vertex_names
         assert "Organization" in vertex_names
 
@@ -30,13 +28,13 @@ class TestRdfInferenceManager:
         mgr = RdfInferenceManager()
         schema, _ = mgr.infer_schema(sample_ontology_path, schema_name="test_rdf")
 
-        person_fields = schema.graph.vertex_config.fields_names("Person")
+        person_fields = schema.core_schema.vertex_config.fields_names("Person")
         assert "name" in person_fields
         assert "age" in person_fields
         assert "_key" in person_fields
         assert "_uri" in person_fields
 
-        org_fields = schema.graph.vertex_config.fields_names("Organization")
+        org_fields = schema.core_schema.vertex_config.fields_names("Organization")
         assert "orgName" in org_fields
         assert "founded" in org_fields
 
@@ -45,7 +43,7 @@ class TestRdfInferenceManager:
         mgr = RdfInferenceManager()
         schema, _ = mgr.infer_schema(sample_ontology_path, schema_name="test_rdf")
 
-        edges = schema.graph.edge_config.edges
+        edges = schema.core_schema.edge_config.edges
         edge_tuples = {(e.source, e.target, e.relation) for e in edges}
 
         assert ("Person", "Organization", "worksFor") in edge_tuples
@@ -95,6 +93,6 @@ class TestRdfInferenceManager:
         mgr = RdfInferenceManager()
         schema, _ = mgr.infer_schema(sample_data_path, schema_name="combined")
 
-        vertex_names = {v.name for v in schema.graph.vertex_config.vertices}
+        vertex_names = {v.name for v in schema.core_schema.vertex_config.vertices}
         assert "Person" in vertex_names
         assert "Organization" in vertex_names

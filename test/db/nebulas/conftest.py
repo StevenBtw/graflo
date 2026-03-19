@@ -24,7 +24,7 @@ from graflo.db import NebulaConfig
 
 MINI_SCHEMA_DICT = {
     "metadata": {"name": "test_graflo", "version": "1.0.0"},
-    "graph": {
+    "core_schema": {
         "vertex_config": {
             "vertices": [
                 {
@@ -131,7 +131,7 @@ def _session_db(_session_conn_conf, _session_schema):
 
 def _clear_test_data(db_client: Connection, schema: Schema) -> None:
     """Delete all vertices and their edges from every tag in the schema."""
-    for vname in schema.graph.vertex_config.vertex_set:
+    for vname in schema.core_schema.vertex_config.vertex_set:
         try:
             db_client.execute(
                 f"LOOKUP ON `{vname}` YIELD id(vertex) AS vid "

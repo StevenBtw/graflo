@@ -25,8 +25,8 @@ from pydantic import BaseModel
 
 from suthing import Timer
 
-from graflo.architecture.ingestion_model import IngestionModel
-from graflo.architecture.onto import EncodingType, GraphContainer
+from graflo.architecture.contract.declarations.ingestion_model import IngestionModel
+from graflo.architecture.graph_types import EncodingType, GraphContainer
 from graflo.architecture.schema import Schema
 from graflo.data_source import (
     AbstractDataSource,
@@ -37,7 +37,7 @@ from graflo.db import DBConfig
 from graflo.hq.db_writer import DBWriter
 from graflo.hq.registry_builder import RegistryBuilder
 from graflo.util.chunker import ChunkerType
-from graflo.architecture.bindings import Bindings
+from graflo.architecture.contract.bindings import Bindings
 
 logger = logging.getLogger(__name__)
 
@@ -435,7 +435,7 @@ class Caster:
         self.schema.db_profile.db_flavor = db_flavor
         self.schema.finish_init()
         self.ingestion_model.finish_init(
-            self.schema.graph,
+            self.schema.core_schema,
             strict_references=ingestion_params.strict_references,
             dynamic_edge_feedback=ingestion_params.dynamic_edges,
         )

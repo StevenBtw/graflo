@@ -12,7 +12,7 @@ from datetime import date, datetime, time as dt_time
 from decimal import Decimal
 from typing import Any
 
-from graflo.architecture.vertex import FieldType
+from graflo.architecture.schema.vertex import FieldType
 from graflo.db.nebula.adapter import NebulaClientAdapter
 from graflo.filter.onto import FilterExpression
 from graflo.onto import ExpressionFlavor

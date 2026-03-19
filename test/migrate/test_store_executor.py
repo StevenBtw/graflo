@@ -20,7 +20,7 @@ def _schema() -> Schema:
     return Schema.from_dict(
         {
             "metadata": {"name": "kg", "version": "1.0.0"},
-            "graph": {
+            "core_schema": {
                 "vertex_config": {
                     "vertices": [
                         {

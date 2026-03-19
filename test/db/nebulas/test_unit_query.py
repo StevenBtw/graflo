@@ -1,6 +1,6 @@
 """Unit tests for NebulaGraph nGQL query builders (no Docker required)."""
 
-from graflo.architecture.vertex import Field, FieldType
+from graflo.architecture.schema.vertex import Field, FieldType
 from graflo.db.nebula.query import (
     aggregate_ngql,
     aggregate_gql,

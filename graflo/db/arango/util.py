@@ -15,7 +15,7 @@ Example:
 
 import logging
 
-from graflo.architecture.edge import Edge
+from graflo.architecture.schema.edge import Edge
 from graflo.filter.onto import FilterExpression
 from graflo.onto import ExpressionFlavor
 

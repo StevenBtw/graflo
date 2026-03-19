@@ -166,7 +166,7 @@ classDiagram
     }
 
     class GraphManifest {
-        +graph_schema: Schema?
+        +schema: Schema?
         +ingestion_model: IngestionModel?
         +bindings: Bindings?
         +finish_init()
@@ -206,14 +206,14 @@ classDiagram
 
     class Schema {
         +metadata: GraphMetadata
-        +graph: GraphModel
+        +core_schema: CoreSchema
         +db_profile: DatabaseProfile
         +finish_init()
         +remove_disconnected_vertices()
         +resolve_db_aware(db_flavor?) SchemaDBAware
     }
 
-    class GraphModel {
+    class CoreSchema {
         +vertex_config: VertexConfig
         +edge_config: EdgeConfig
         +finish_init()
@@ -222,7 +222,7 @@ classDiagram
     class IngestionModel {
         +resources: list~Resource~
         +transforms: list~ProtoTransform~
-        +finish_init(graph)
+        +finish_init(core_schema)
         +fetch_resource(name) Resource
     }
 
@@ -320,9 +320,9 @@ classDiagram
     }
 
     Schema *-- GraphMetadata : metadata
-    Schema *-- GraphModel : graph
-    GraphModel *-- VertexConfig : vertex_config
-    GraphModel *-- EdgeConfig : edge_config
+    Schema *-- CoreSchema : core_schema
+    CoreSchema *-- VertexConfig : vertex_config
+    CoreSchema *-- EdgeConfig : edge_config
     IngestionModel *-- "0..*" Resource : resources
     IngestionModel *-- "0..*" ProtoTransform : transforms
 
@@ -491,7 +491,7 @@ The `IngestionModel` is the source of truth for ingestion runtime behavior. It e
 
 - Resource mappings and actor pipelines
 - Reusable named transforms
-- Runtime initialization against the logical graph (`finish_init(schema.graph)`)
+- Runtime initialization against the core schema (`finish_init(schema.core_schema)`)
 
 ### Vertex
 A `Vertex` describes vertices and their logical identity. It supports:
@@ -743,6 +743,24 @@ Example: strip `raw_` only from selected keys:
         mode: include
         names: [raw_id, raw_label]
 ```
+
+#### Grouped value transforms
+
+For repeated tuple-style value calls, use explicit `input_groups` in
+`transform.call`:
+
+```yaml
+- transform:
+    call:
+      module: my_pkg.transforms
+      foo: join_name
+      input_groups:
+        - [fname_parent, lname_parent]
+        - [fname_child, lname_child]
+      output: [parent_name, child_name]
+```
+
+This executes one function call per group with deterministic output mapping.
 
 ```mermaid
 flowchart LR

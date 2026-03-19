@@ -5,8 +5,8 @@ import logging
 import pytest
 
 from graflo.architecture.database_features import DatabaseProfile
-from graflo.architecture.db_aware import VertexConfigDBAware
-from graflo.architecture.vertex import Field, FieldType, Vertex, VertexConfig
+from graflo.architecture.schema import VertexConfigDBAware
+from graflo.architecture.schema.vertex import Field, FieldType, Vertex, VertexConfig
 from graflo.onto import DBType
 
 logger = logging.getLogger(__name__)
