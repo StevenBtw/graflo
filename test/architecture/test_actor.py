@@ -19,6 +19,7 @@ from graflo.architecture.pipeline.runtime.actor.config import (
 )
 from graflo.architecture.contract.declarations.transform import (
     DressConfig,
+    KeySelectionConfig,
     ProtoTransform,
 )
 from graflo.architecture.schema.vertex import VertexConfig
@@ -498,6 +499,104 @@ def test_transform_named_proto_binding_local_io_overrides_library_io():
     assert payload.positional == ()
 
 
+def test_transform_named_proto_inherits_target_keys_from_library():
+    anw = ActorWrapper(
+        pipeline=[
+            {"transform": {"call": {"use": "snake_keys"}}},
+        ]
+    )
+    transforms = {
+        "snake_keys": ProtoTransform(
+            name="snake_keys",
+            module="graflo.util.transform",
+            foo="camel_to_snake",
+            target="keys",
+        )
+    }
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=VertexConfig(vertices=[]),
+            edge_config=EdgeConfig(),
+            transforms=transforms,
+        )
+    )
+
+    ctx = ActionContext()
+    ctx = anw(ctx, doc={"zipCode": "NW1"})
+    payload = ctx.buffer_transforms[LocationIndex(path=(0,))][0]
+    assert payload.named == {"zip_code": "NW1"}
+    assert payload.positional == ()
+
+
+def test_transform_named_proto_call_overrides_library_keys_selection():
+    anw = ActorWrapper(
+        pipeline=[
+            {
+                "transform": {
+                    "call": {
+                        "use": "strip_raw",
+                        "keys": {"mode": "include", "names": ["raw_label"]},
+                    }
+                }
+            }
+        ]
+    )
+    transforms = {
+        "strip_raw": ProtoTransform(
+            name="strip_raw",
+            module="graflo.util.transform",
+            foo="remove_prefix",
+            params={"prefix": "raw_"},
+            target="keys",
+            keys=KeySelectionConfig(mode="include", names=("raw_id",)),
+        )
+    }
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=VertexConfig(vertices=[]),
+            edge_config=EdgeConfig(),
+            transforms=transforms,
+        )
+    )
+
+    ctx = ActionContext()
+    ctx = anw(ctx, doc={"raw_id": "1", "raw_label": "Alice"})
+    payload = ctx.buffer_transforms[LocationIndex(path=(0,))][0]
+    assert payload.named == {"raw_id": "1", "label": "Alice"}
+    assert payload.positional == ()
+
+
+def test_transform_named_proto_keys_merge_fails_when_call_has_input():
+    anw = ActorWrapper(
+        pipeline=[
+            {
+                "transform": {
+                    "call": {
+                        "use": "snake_keys",
+                        "input": ["zipCode"],
+                    }
+                }
+            }
+        ]
+    )
+    transforms = {
+        "snake_keys": ProtoTransform(
+            name="snake_keys",
+            module="graflo.util.transform",
+            foo="camel_to_snake",
+            target="keys",
+        )
+    }
+    with pytest.raises(ValueError, match="effective transform target is keys"):
+        anw.finish_init(
+            init_ctx=ActorInitContext(
+                vertex_config=VertexConfig(vertices=[]),
+                edge_config=EdgeConfig(),
+                transforms=transforms,
+            )
+        )
+
+
 def test_transform_named_proto_binding_inherits_dress_from_library():
     anw = ActorWrapper(
         pipeline=[
@@ -818,6 +917,54 @@ def test_transform_grouped_call_use_accepts_inline_input_groups_override():
             foo="add",
             input=("unused_left", "unused_right"),
             output=("unused_result",),
+        )
+    }
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=VertexConfig(vertices=[]),
+            edge_config=EdgeConfig(),
+            transforms=transforms,
+        )
+    )
+    ctx = ActionContext()
+    ctx = anw(
+        ctx,
+        doc={
+            "fname_parent": "Ada ",
+            "lname_parent": "Lovelace",
+            "fname_child": "Alan ",
+            "lname_child": "Turing",
+        },
+    )
+    payload = ctx.buffer_transforms[LocationIndex(path=(0,))][0]
+    assert payload.named == {"parent_name": "Ada Lovelace", "child_name": "Alan Turing"}
+    assert payload.positional == ()
+
+
+def test_transform_grouped_call_use_inline_groups_do_not_inherit_proto_output_groups():
+    anw = ActorWrapper(
+        pipeline=[
+            {
+                "transform": {
+                    "call": {
+                        "use": "join_name",
+                        "input_groups": [
+                            ["fname_parent", "lname_parent"],
+                            ["fname_child", "lname_child"],
+                        ],
+                        "output": ["parent_name", "child_name"],
+                    }
+                }
+            }
+        ]
+    )
+    transforms = {
+        "join_name": ProtoTransform(
+            name="join_name",
+            module="operator",
+            foo="add",
+            input_groups=(("unused_left", "unused_right"),),
+            output_groups=(("unused_a", "unused_b"),),
         )
     }
     anw.finish_init(

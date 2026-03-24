@@ -345,10 +345,6 @@ class Caster:
         rows_dressed = [{k: v for k, v in zip(columns, item)} for item in _data]
         return rows_dressed
 
-    # ------------------------------------------------------------------
-    # Ingestion orchestration
-    # ------------------------------------------------------------------
-
     async def ingest_data_sources(
         self,
         data_source_registry: DataSourceRegistry,
