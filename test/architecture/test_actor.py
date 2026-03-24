@@ -1,5 +1,7 @@
 import logging
 
+import pytest
+
 from graflo.architecture.pipeline.runtime.actor import (
     ActorInitContext,
     ActorWrapper,
@@ -351,6 +353,16 @@ def test_normalize_actor_step_nested_descend_apply_create_edge_shape():
     config = validate_actor_step(normalized)
     assert config.type == "descend"
     assert config.pipeline[0].type == "edge"  # type: ignore[arg-type]
+
+
+def test_validate_actor_step_reports_clear_error_for_invalid_shape():
+    with pytest.raises(ValueError, match="Invalid actor step configuration"):
+        validate_actor_step(normalize_actor_step({"foo": "int", "module": "builtins"}))
+
+
+def test_validate_actor_step_reports_clear_error_for_legacy_map():
+    with pytest.raises(ValueError, match="`map` is legacy syntax"):
+        validate_actor_step(normalize_actor_step({"transform": {"map": {"a": "b"}}}))
 
 
 def test_transform_tuple_output_maps_to_vertex_index_fields_in_order():
@@ -779,6 +791,89 @@ def test_transform_grouped_call_use_inherits_input_groups():
     )
     payload = ctx.buffer_transforms[LocationIndex(path=(0,))][0]
     assert payload.named == {"parent_name": "Ada Lovelace", "child_name": "Alan Turing"}
+    assert payload.positional == ()
+
+
+def test_transform_grouped_call_use_accepts_inline_input_groups_override():
+    anw = ActorWrapper(
+        pipeline=[
+            {
+                "transform": {
+                    "call": {
+                        "use": "join_name",
+                        "input_groups": [
+                            ["fname_parent", "lname_parent"],
+                            ["fname_child", "lname_child"],
+                        ],
+                        "output_groups": [["parent_name"], ["child_name"]],
+                    }
+                }
+            }
+        ]
+    )
+    transforms = {
+        "join_name": ProtoTransform(
+            name="join_name",
+            module="operator",
+            foo="add",
+            input=("unused_left", "unused_right"),
+            output=("unused_result",),
+        )
+    }
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=VertexConfig(vertices=[]),
+            edge_config=EdgeConfig(),
+            transforms=transforms,
+        )
+    )
+    ctx = ActionContext()
+    ctx = anw(
+        ctx,
+        doc={
+            "fname_parent": "Ada ",
+            "lname_parent": "Lovelace",
+            "fname_child": "Alan ",
+            "lname_child": "Turing",
+        },
+    )
+    payload = ctx.buffer_transforms[LocationIndex(path=(0,))][0]
+    assert payload.named == {"parent_name": "Ada Lovelace", "child_name": "Alan Turing"}
+    assert payload.positional == ()
+
+
+def test_transform_call_inline_module_foo_path_remains_supported():
+    anw = ActorWrapper(
+        pipeline=[
+            {
+                "transform": {
+                    "call": {
+                        "module": "operator",
+                        "foo": "add",
+                        "input": ["first_name", "last_name"],
+                        "output": ["full_name"],
+                    }
+                }
+            }
+        ]
+    )
+    anw.finish_init(
+        init_ctx=ActorInitContext(
+            vertex_config=VertexConfig(vertices=[]),
+            edge_config=EdgeConfig(),
+            transforms={},
+        )
+    )
+    ctx = ActionContext()
+    ctx = anw(
+        ctx,
+        doc={
+            "first_name": "Ada ",
+            "last_name": "Lovelace",
+        },
+    )
+    payload = ctx.buffer_transforms[LocationIndex(path=(0,))][0]
+    assert payload.named == {"full_name": "Ada Lovelace"}
     assert payload.positional == ()
 
 

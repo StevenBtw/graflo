@@ -26,6 +26,7 @@ class TransformActor(Actor):
     def __init__(self, config: TransformActorConfig):
         self.transforms: dict[str, ProtoTransform] = {}
         self.call_use: str | None = None
+        self._call_config = None
 
         if config.rename is not None:
             self.t = Transform(map=config.rename)
@@ -37,6 +38,7 @@ class TransformActor(Actor):
             )
 
         call = config.call
+        self._call_config = call
         self.call_use = call.use
         transform_kwargs: dict[str, Any] = {
             "name": call.use,
@@ -61,6 +63,11 @@ class TransformActor(Actor):
         }
         if call.keys is not None:
             transform_kwargs["keys"] = call.keys.model_dump()
+        # When call.use references ingestion_model.transforms, defer strict
+        # transform validation until finish_init can hydrate module/foo.
+        if call.use is not None and call.module is None and call.foo is None:
+            self.t = Transform(name=call.use)
+            return
         self.t = Transform(
             **transform_kwargs,
         )
@@ -81,6 +88,8 @@ class TransformActor(Actor):
         self.transforms = init_ctx.transforms
         if self.call_use is None or self.t._foo is not None:
             return
+        if self._call_config is None:
+            return
         pt = self.transforms.get(self.call_use, None)
         if pt is None:
             if init_ctx.strict_references:
@@ -89,28 +98,44 @@ class TransformActor(Actor):
                     "was not found in ingestion_model.transforms."
                 )
             return
-        next_params = self.t.params if self.t.params else pt.params
-        next_dress = self.t.dress if self.t.dress is not None else pt.dress
-        if self.t.target == "keys":
-            next_input: tuple[str, ...] = self.t.input
-            next_output: tuple[str, ...] = self.t.output
+        call = self._call_config
+        next_params = call.params if call.params else pt.params
+        next_dress = call.dress if call.dress is not None else pt.dress
+        if call.target == "keys":
+            next_input: tuple[str, ...] = ()
+            next_output: tuple[str, ...] = ()
             next_input_groups: tuple[tuple[str, ...], ...] = ()
             next_output_groups: tuple[tuple[str, ...], ...] = ()
         else:
-            next_input = self.t.input if self.t.input else pt.input
-            if next_dress is not None:
-                next_output = (next_dress.key, next_dress.value)
-            else:
-                next_output = self.t.output if self.t.output else pt.output
             next_input_groups = (
-                self.t.input_groups if self.t.input_groups else pt.input_groups
+                tuple(tuple(group) for group in call.input_groups)
+                if call.input_groups
+                else pt.input_groups
             )
             next_output_groups = (
-                self.t.output_groups if self.t.output_groups else pt.output_groups
+                tuple(tuple(group) for group in call.output_groups)
+                if call.output_groups
+                else pt.output_groups
             )
+            # Grouped mode is mutually exclusive with flat input/fields.
+            if next_input_groups:
+                next_input = ()
+                # If groups are overridden inline, do not inherit flat proto output.
+                if call.input_groups:
+                    next_output = tuple(call.output) if call.output else ()
+                elif next_dress is not None:
+                    next_output = (next_dress.key, next_dress.value)
+                else:
+                    next_output = tuple(call.output) if call.output else pt.output
+            else:
+                next_input = tuple(call.input) if call.input else pt.input
+                if next_dress is not None:
+                    next_output = (next_dress.key, next_dress.value)
+                else:
+                    next_output = tuple(call.output) if call.output else pt.output
         transform_kwargs: dict[str, Any] = {
             "dress": next_dress,
-            "name": self.t.name,
+            "name": call.use,
             "module": pt.module,
             "foo": pt.foo,
             "params": next_params,
@@ -118,10 +143,11 @@ class TransformActor(Actor):
             "output": next_output,
             "input_groups": next_input_groups,
             "output_groups": next_output_groups,
-            "strategy": self.t.strategy,
-            "target": self.t.target,
-            "keys": self.t.keys,
+            "strategy": call.strategy or "single",
+            "target": call.target,
         }
+        if call.keys is not None:
+            transform_kwargs["keys"] = call.keys.model_dump()
         self.t = Transform(**transform_kwargs)
 
     def _extract_doc(self, nargs: tuple[Any, ...], **kwargs: Any) -> dict[str, Any]:
