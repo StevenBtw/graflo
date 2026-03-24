@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.7.5] - 2026-03-25
+
+### Added
+- **Row-level cast errors**: `IngestionParams` gains `on_row_error` (`skip` | `fail`, default `skip`), optional `row_error_dead_letter_path` (JSONL), `max_row_errors`, `row_error_doc_preview_max_bytes`, and `row_error_doc_keys` for bounded, debug-friendly failure records. Skip mode logs each failure at ERROR when no dead-letter path is set.
+- **`CastBatchResult`**, **`RowCastFailure`**, and **`RowErrorBudgetExceeded`** exported from `graflo` / `graflo.hq`.
+- CLI `ingest`: `--on-row-error` and `--row-error-dead-letter`.
+
+### Changed
+- **`ProtoTransform`**: **`target`** (`values` | `keys`) is defined on the proto/base transform model (with **`keys`** selection alongside it), not only on **`Transform`** — shared targeting semantics for vocabulary-style and full transform definitions.
+- **`Caster.cast_normal_resource`** now returns **`CastBatchResult`** with `.graph` and `.failures` instead of a bare `GraphContainer`.
+- **`TransformException`** subclasses **`Exception`** (was `BaseException`) so it is handled like other application errors.
+
 ## [1.7.4] - 2026-03-19
 
 ### Added

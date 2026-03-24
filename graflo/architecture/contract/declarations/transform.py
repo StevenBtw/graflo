@@ -88,7 +88,7 @@ def _normalize_keys_in_dict(data: dict[str, Any]) -> None:
         data["keys"] = keys
 
 
-class TransformException(BaseException):
+class TransformException(Exception):
     """Base exception for transform-related errors."""
 
     pass
