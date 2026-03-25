@@ -145,6 +145,216 @@ _TYPE_LOOKUP_VIEW: dict[str, object] = {
 }
 
 
+def _setup_split_lookup_tables_db() -> str:
+    """Edge table with separate source/target lookup tables (same column names)."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn_str = f"sqlite:///{path}"
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(conn_str)
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE src_entity_types (
+                    entity_id TEXT PRIMARY KEY,
+                    type_name TEXT NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE tgt_entity_types (
+                    entity_id TEXT PRIMARY KEY,
+                    type_name TEXT NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO src_entity_types (entity_id, type_name) VALUES
+                    ('a1', 'project'),
+                    ('a2', 'task'),
+                    ('a3', 'project'),
+                    ('a4', 'task'),
+                    ('a5', 'milestone')
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO tgt_entity_types (entity_id, type_name) VALUES
+                    ('a1', 'project'),
+                    ('a2', 'task'),
+                    ('a3', 'project'),
+                    ('a4', 'task'),
+                    ('a5', 'milestone')
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE mix_links (
+                    id INTEGER PRIMARY KEY,
+                    parent TEXT NOT NULL,
+                    child TEXT NOT NULL,
+                    link_type TEXT NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO mix_links (id, parent, child, link_type) VALUES
+                    (1, 'a1', 'a2', 'contains'),
+                    (2, 'a3', 'a4', 'contains'),
+                    (3, 'a1', 'a5', 'depends_on')
+                """
+            )
+        )
+        conn.commit()
+    return conn_str
+
+
+def _setup_mismatched_join_keys_db() -> str:
+    """One lookup table; source FK joins by_uuid, target FK joins by_code."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn_str = f"sqlite:///{path}"
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(conn_str)
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE wide_types (
+                    by_uuid TEXT PRIMARY KEY,
+                    by_code TEXT NOT NULL UNIQUE,
+                    type_name TEXT NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO wide_types (by_uuid, by_code, type_name) VALUES
+                    ('a1', 'PU-A1', 'project'),
+                    ('a2', 'CH-A2', 'task'),
+                    ('a3', 'PU-A3', 'project'),
+                    ('a4', 'CH-A4', 'task'),
+                    ('a5', 'MS-A5', 'milestone')
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE wide_links (
+                    id INTEGER PRIMARY KEY,
+                    parent_uuid TEXT NOT NULL,
+                    child_code TEXT NOT NULL,
+                    link_type TEXT NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO wide_links (id, parent_uuid, child_code, link_type) VALUES
+                    (1, 'a1', 'CH-A2', 'contains'),
+                    (2, 'a3', 'CH-A4', 'contains'),
+                    (3, 'a1', 'MS-A5', 'depends_on')
+                """
+            )
+        )
+        conn.commit()
+    return conn_str
+
+
+def _setup_split_distinct_type_columns_db() -> str:
+    """Separate lookup tables with different discriminator column names."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn_str = f"sqlite:///{path}"
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(conn_str)
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE src_kind (entity_id TEXT PRIMARY KEY, vertex_kind TEXT NOT NULL)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE tgt_kind (entity_id TEXT PRIMARY KEY, label TEXT NOT NULL)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO src_kind (entity_id, vertex_kind) VALUES
+                    ('a1', 'project'),
+                    ('a2', 'task'),
+                    ('a3', 'project'),
+                    ('a4', 'task'),
+                    ('a5', 'milestone')
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO tgt_kind (entity_id, label) VALUES
+                    ('a1', 'project'),
+                    ('a2', 'task'),
+                    ('a3', 'project'),
+                    ('a4', 'task'),
+                    ('a5', 'milestone')
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE typecol_links (
+                    id INTEGER PRIMARY KEY,
+                    parent TEXT NOT NULL,
+                    child TEXT NOT NULL,
+                    link_type TEXT NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO typecol_links (id, parent, child, link_type) VALUES
+                    (1, 'a1', 'a2', 'contains'),
+                    (2, 'a3', 'a4', 'contains'),
+                    (3, 'a1', 'a5', 'depends_on')
+                """
+            )
+        )
+        conn.commit()
+    return conn_str
+
+
 class TestSelectSpecFromDict:
     """Parsing SelectSpec from declarative dicts."""
 
@@ -209,11 +419,91 @@ class TestTableConnectorViewFeedsEdgeRouter:
         )
 
 
+class TestTypeLookupPerSideConfiguration:
+    """Per-side lookup table and join key overrides."""
+
+    def test_split_source_target_lookup_tables(self):
+        conn_str = _setup_split_lookup_tables_db()
+        spec = SelectSpec(
+            kind="type_lookup",
+            source_table="src_entity_types",
+            target_table="tgt_entity_types",
+            identity="entity_id",
+            type_column="type_name",
+            source="parent",
+            target="child",
+            relation="link_type",
+        )
+        sql = _sql_for_sqlite(spec.build_sql(schema="main", base_table="mix_links"))
+        assert '"src_entity_types" s' in sql
+        assert '"tgt_entity_types" t' in sql
+        rows = _fetch_rows(conn_str, sql)
+        triples = _run_router_on_rows(_symmetric_edge_router(), rows)
+        assert Counter(triples) == Counter(
+            [
+                ("project", "task", "contains"),
+                ("project", "task", "contains"),
+                ("project", "milestone", "depends_on"),
+            ]
+        )
+
+    def test_mismatched_join_keys_same_lookup_table(self):
+        conn_str = _setup_mismatched_join_keys_db()
+        spec = SelectSpec(
+            kind="type_lookup",
+            table="wide_types",
+            type_column="type_name",
+            source="parent_uuid",
+            target="child_code",
+            source_identity="by_uuid",
+            target_identity="by_code",
+            relation="link_type",
+        )
+        sql = _sql_for_sqlite(spec.build_sql(schema="main", base_table="wide_links"))
+        assert 'r."parent_uuid" = s."by_uuid"' in sql
+        assert 'r."child_code" = t."by_code"' in sql
+        rows = _fetch_rows(conn_str, sql)
+        triples = _run_router_on_rows(_symmetric_edge_router(), rows)
+        assert Counter(triples) == Counter(
+            [
+                ("project", "task", "contains"),
+                ("project", "task", "contains"),
+                ("project", "milestone", "depends_on"),
+            ]
+        )
+
+    def test_per_side_type_column_names(self):
+        conn_str = _setup_split_distinct_type_columns_db()
+        spec = SelectSpec(
+            kind="type_lookup",
+            source_table="src_kind",
+            target_table="tgt_kind",
+            identity="entity_id",
+            source_type_column="vertex_kind",
+            target_type_column="label",
+            source="parent",
+            target="child",
+            relation="link_type",
+        )
+        sql = _sql_for_sqlite(spec.build_sql(schema="main", base_table="typecol_links"))
+        assert 's."vertex_kind" AS source_type' in sql
+        assert 't."label" AS target_type' in sql
+        rows = _fetch_rows(conn_str, sql)
+        triples = _run_router_on_rows(_symmetric_edge_router(), rows)
+        assert Counter(triples) == Counter(
+            [
+                ("project", "task", "contains"),
+                ("project", "task", "contains"),
+                ("project", "milestone", "depends_on"),
+            ]
+        )
+
+
 class TestSelectKindSelectAsymmetricLookup:
     """kind=select with a single type join: static source vertex, dynamic target type."""
 
     def test_single_join_select_static_source_dynamic_target(self):
-        """Only target side uses entity_types join; source type is fixed in SQL + config."""
+        """Inline SQL fallback when type_lookup shorthand is not enough."""
         conn_str = _setup_test_db()
         spec = SelectSpec(
             kind="select",
