@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.7.7] - 2026-03-27
+
+### Changed
+- **Edge identity policy (Cypher property-graph targets)**: For Neo4j, Memgraph, and FalkorDB, relationship upserts use `MERGE` with properties that distinguish **parallel** edges (same endpoints and relationship type). `EdgeConfigDBAware.relationship_merge_property_names` now **prefers the first** logical `Edge.identities` key: tokens `source` and `target` are omitted (endpoints are already matched on nodes); the `relation` token maps to the relationship property where applicable. If `identities` is empty or yields no relationship fields, behavior falls back to **all** `weights.direct` field names so existing schemas keep stable merge keys.
+- **Cypher MERGE map builders**: `graflo.db.cypher.rel_merge_props_map_from_row_index` and `rel_merge_props_map_from_row_props` normalize property names and emit safe map entries for batched `MERGE` clauses.
+
 ## [1.7.6] - 2026-03-26
 
 ### Added
