@@ -29,3 +29,9 @@ The `vertex_indexes` in `database_features` is for **secondary** indexes only. I
 ## Schema Required
 
 When `schema` is `None` in `define_vertex_indexes`, identity indexes cannot be ensured for Neo4j, Memgraph, FalkorDB, and Nebula. A warning is logged. Always pass the schema when calling `define_vertex_indexes` or `define_indexes` during `init_db`.
+
+## Edge upserts and `MERGE` (Neo4j, Memgraph, FalkorDB)
+
+Vertex upserts use node keys from `Vertex` identity. For edges, endpoints are matched on those vertex keys; the relationship itself is merged using a **relationship property map** so parallel edges remain distinct.
+
+GraFlo chooses property names for that map from the edge’s logical identity policy: the **first** entry in `Edge.identities` (excluding `source` / `target` tokens; including a `relation` token as the relationship’s `relation` property when applicable). If `identities` is empty or does not name any relationship fields, **all** `weights.direct` field names are used instead. Compile-time edge **indexes** from `identities` (via `database_features`) remain separate from this writer-time `MERGE` key selection; both should agree with your intended uniqueness for a given edge definition.

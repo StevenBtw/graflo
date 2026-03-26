@@ -524,6 +524,8 @@ Edges in graflo support a rich set of attributes that enable flexible relationsh
 - **`identities`**: Logical identity keys for the edge (each key can induce uniqueness)
 - **`weights`**: Optional weight configuration for edge properties
 
+**Neo4j, Memgraph, FalkorDB — relationship `MERGE` keys:** Writers match source and target nodes on vertex identity, then `MERGE` the relationship. Which **relationship properties** participate in that `MERGE` (so multiple edges between the same two vertices do not collapse) is derived as follows: use the **first** `identities` key, keep only tokens that refer to relationship payload (skip `source` and `target`; the `relation` token becomes the `relation` property on the relationship where used). If that produces no fields—e.g. `identities` is empty—the writer falls back to **all** names in `weights.direct`. Declare `identities` when direct weights are a superset of what should define edge uniqueness.
+
 #### Relationship Type Configuration 
 - **`relation`**: Explicit relationship name (primarily for Neo4j)
 - **`relation_field`**: Field name containing relationship type values (for CSV/tabular data)
