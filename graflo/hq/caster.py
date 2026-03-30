@@ -465,6 +465,7 @@ class Caster:
         data_source_registry: DataSourceRegistry,
         conn_conf: DBConfig,
         ingestion_params: IngestionParams | None = None,
+        allowed_resource_names: set[str] | None = None,
     ):
         """Ingest data from data sources in a registry.
 
@@ -484,41 +485,16 @@ class Caster:
         self._row_error_total = 0
         init_only = ingestion_params.init_only
 
-        if ingestion_params.resources is not None:
-            known_resources = set(self.ingestion_model._resources.keys())
-            requested = set(ingestion_params.resources)
-            unknown = requested - known_resources
-            if unknown:
-                raise ValueError(
-                    "Unknown resources in ingestion_params.resources: "
-                    + ", ".join(sorted(unknown))
-                )
-            resources_filter: set[str] | None = requested
-        else:
-            resources_filter = None
-
-        if ingestion_params.vertices is not None:
-            known_vertices = {
-                v.name for v in self.schema.core_schema.vertex_config.vertices
-            }
-            requested = set(ingestion_params.vertices)
-            unknown = requested - known_vertices
-            if unknown:
-                raise ValueError(
-                    "Unknown vertices in ingestion_params.vertices: "
-                    + ", ".join(sorted(unknown))
-                )
-            self._allowed_vertex_names = requested
-        else:
-            self._allowed_vertex_names = None
-
         if init_only:
             logger.info("ingest execution bound to init")
             sys.exit(0)
 
         tasks: list[AbstractDataSource] = []
         for resource_name in self.ingestion_model._resources.keys():
-            if resources_filter is not None and resource_name not in resources_filter:
+            if (
+                allowed_resource_names is not None
+                and resource_name not in allowed_resource_names
+            ):
                 continue
             data_sources = data_source_registry.get_data_sources(resource_name)
             if data_sources:
@@ -578,22 +554,7 @@ class Caster:
         self.schema.db_profile.db_flavor = db_flavor
         self.schema.finish_init()
 
-        # Resolve allowed vertex policy early so runtime actor initialization can
-        # build a filtered VertexConfig and skip extracting/casting disallowed types.
-        if ingestion_params.vertices is not None:
-            known_vertices = {
-                v.name for v in self.schema.core_schema.vertex_config.vertices
-            }
-            requested = set(ingestion_params.vertices)
-            unknown = requested - known_vertices
-            if unknown:
-                raise ValueError(
-                    "Unknown vertices in ingestion_params.vertices: "
-                    + ", ".join(sorted(unknown))
-                )
-            self._allowed_vertex_names = requested
-        else:
-            self._allowed_vertex_names = None
+        allowed_resource_names = self._resolve_ingestion_scope(ingestion_params)
 
         self.ingestion_model.finish_init(
             self.schema.core_schema,
@@ -614,12 +575,50 @@ class Caster:
                 data_source_registry=registry,
                 conn_conf=target_db_config,
                 ingestion_params=ingestion_params,
+                allowed_resource_names=allowed_resource_names,
             )
         )
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _resolve_ingestion_scope(
+        self, ingestion_params: IngestionParams
+    ) -> set[str] | None:
+        """Resolve and validate resource/vertex filters for ingestion.
+
+        Resolution order is resources first, then vertices.
+        """
+        if ingestion_params.resources is not None:
+            known_resources = set(self.ingestion_model._resources.keys())
+            requested_resources = set(ingestion_params.resources)
+            unknown_resources = requested_resources - known_resources
+            if unknown_resources:
+                raise ValueError(
+                    "Unknown resources in ingestion_params.resources: "
+                    + ", ".join(sorted(unknown_resources))
+                )
+            allowed_resource_names: set[str] | None = requested_resources
+        else:
+            allowed_resource_names = None
+
+        if ingestion_params.vertices is not None:
+            known_vertices = {
+                v.name for v in self.schema.core_schema.vertex_config.vertices
+            }
+            requested_vertices = set(ingestion_params.vertices)
+            unknown_vertices = requested_vertices - known_vertices
+            if unknown_vertices:
+                raise ValueError(
+                    "Unknown vertices in ingestion_params.vertices: "
+                    + ", ".join(sorted(unknown_vertices))
+                )
+            self._allowed_vertex_names = requested_vertices
+        else:
+            self._allowed_vertex_names = None
+
+        return allowed_resource_names
 
     def _make_db_writer(self) -> DBWriter:
         """Create a :class:`DBWriter` from the current ingestion params."""
