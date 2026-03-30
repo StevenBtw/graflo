@@ -20,10 +20,9 @@ import logging
 import sys
 import traceback
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field
 
 from suthing import Timer
 
@@ -41,56 +40,41 @@ from graflo.hq.registry_builder import RegistryBuilder
 from graflo.util.chunker import ChunkerType
 from graflo.architecture.contract.bindings import Bindings
 from graflo.hq.connection_provider import ConnectionProvider, EmptyConnectionProvider
+from graflo.hq.ingestion_parameters import (
+    CastBatchResult,
+    IngestionParams,
+    RowCastFailure,
+    RowErrorBudgetExceeded,
+)
 
 logger = logging.getLogger(__name__)
 
 _ROW_ERROR_TRACEBACK_MAX_CHARS = 16_384
 
 
-class RowErrorBudgetExceeded(RuntimeError):
-    """Raised when total row cast failures exceed ``IngestionParams.max_row_errors``."""
+def _filter_graph_container_by_vertices_inplace(
+    gc: GraphContainer, *, allowed_vertex_names: set[str] | None
+) -> None:
+    """Restrict persistence to a subset of vertex types.
 
-    def __init__(
-        self,
-        *,
-        total_failures: int,
-        limit: int,
-        dead_letter_path: Path | None,
-    ) -> None:
-        self.total_failures = total_failures
-        self.limit = limit
-        self.dead_letter_path = dead_letter_path
-        dl = str(dead_letter_path) if dead_letter_path else "(not configured)"
-        super().__init__(
-            f"Row error budget exceeded: {total_failures} total failures "
-            f"(limit {limit}). Dead letter: {dl}"
-        )
+    Mutates *gc* in-place, removing:
+    - vertex collections whose names are not in *allowed_vertex_names*
+    - edge collections whose source/target vertex names are not allowed
+    """
 
+    if allowed_vertex_names is None:
+        return
 
-class RowCastFailure(BaseModel):
-    """Structured record for a single row that failed during resource casting."""
-
-    resource_name: str
-    row_index: int
-    exception_type: str
-    message: str
-    traceback: str = Field(
-        default="",
-        description="Formatted traceback, truncated to the configured max length.",
-    )
-    doc_preview: Any = Field(
-        default=None,
-        description="Subset or truncated JSON of the source document for debugging.",
-    )
-
-
-class CastBatchResult(BaseModel):
-    """Outcome of casting a batch through a resource (possibly with skipped rows)."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    graph: GraphContainer
-    failures: list[RowCastFailure] = Field(default_factory=list)
+    gc.vertices = {
+        vcol: items
+        for vcol, items in gc.vertices.items()
+        if vcol in allowed_vertex_names
+    }
+    gc.edges = {
+        (vfrom, vto, rel): items
+        for (vfrom, vto, rel), items in gc.edges.items()
+        if vfrom in allowed_vertex_names and vto in allowed_vertex_names
+    }
 
 
 def _format_traceback(exc: BaseException) -> str:
@@ -136,72 +120,6 @@ def _row_failure_from_exception(
     )
 
 
-class IngestionParams(BaseModel):
-    """Parameters for controlling the ingestion process.
-
-    Attributes:
-        clear_data: If True, remove all existing graph data before ingestion without
-            changing the schema.
-        n_cores: Number of CPU cores/threads to use for parallel processing
-        max_items: Maximum number of items to process per resource (applies to all data sources)
-        batch_size: Size of batches for processing
-        dry: Whether to perform a dry run (no database changes)
-        init_only: Whether to only initialize the database without ingestion
-        limit_files: Optional limit on number of files to process
-        max_concurrent_db_ops: Maximum number of concurrent database operations (for vertices/edges).
-            If None, uses n_cores. Set to 1 to prevent deadlocks in databases that don't handle
-            concurrent transactions well (e.g., Neo4j). Database-independent setting.
-        datetime_after: Inclusive lower bound for datetime filtering (ISO format).
-            Rows with date_column >= datetime_after are included. Used with SQL/table sources.
-        datetime_before: Exclusive upper bound for datetime filtering (ISO format).
-            Rows with date_column < datetime_before are included. Range is [datetime_after, datetime_before).
-        datetime_column: Default column name for datetime filtering when the connector does not
-            specify date_field. Per-table override: set date_field on TableConnector (or FileConnector).
-        strict_references: If True, fail fast during model/resource initialization when
-            named references cannot be resolved (for example, a
-            ``transform.call.use`` value that does not exist in
-            ``ingestion_model.transforms``). If False, unresolved references may be
-            tolerated by legacy paths.
-        strict_registry: If True, fail registry build when resources cannot be wired to
-            concrete sources/connectors (missing connector/type/mismatch/source build
-            errors). If False, those issues are logged and skipped, allowing partial
-            ingestion.
-        dynamic_edges: If True, feedback edge declarations discovered during resource
-            runtime initialization (e.g. edge actors) into the shared schema edge
-            config. Keep False to preserve pure logical-schema immutability.
-        on_row_error: ``skip`` continues the batch on per-row cast errors (default);
-            ``fail`` fails the batch on the first error (legacy behavior).
-        row_error_dead_letter_path: If set, append one JSON line per failed row
-            (JSONL) for debugging.
-        max_row_errors: If set, total failed rows across the ingest run must not
-            exceed this value or :class:`RowErrorBudgetExceeded` is raised.
-        row_error_doc_preview_max_bytes: Max UTF-8 size for serialized ``doc_preview``.
-        row_error_doc_keys: If set, only these keys from the source doc appear in
-            ``doc_preview`` (recommended when documents may contain sensitive fields).
-    """
-
-    clear_data: bool = False
-    n_cores: int = 1
-    max_items: int | None = None
-    batch_size: int = 10000
-    dry: bool = False
-    init_only: bool = False
-    limit_files: int | None = None
-    max_concurrent_db_ops: int | None = None
-    datetime_after: str | None = None
-    datetime_before: str | None = None
-    datetime_column: str | None = None
-    # Strict contract checks for major-release style validation workflows.
-    strict_references: bool = True
-    strict_registry: bool = True
-    dynamic_edges: bool = False
-    on_row_error: Literal["skip", "fail"] = "skip"
-    row_error_dead_letter_path: Path | None = None
-    max_row_errors: int | None = None
-    row_error_doc_preview_max_bytes: int = 4096
-    row_error_doc_keys: tuple[str, ...] | None = None
-
-
 class Caster:
     """Main class for data casting and ingestion.
 
@@ -239,6 +157,7 @@ class Caster:
         self.ingestion_params = ingestion_params
         self.schema = schema
         self.ingestion_model = ingestion_model
+        self._allowed_vertex_names: set[str] | None = None
         self._row_error_total = 0
         self._row_error_io_lock = asyncio.Lock()
 
@@ -307,6 +226,9 @@ class Caster:
             coros = [process_doc(doc) for doc in doc_list]
             docs = await asyncio.gather(*coros)
             graph = GraphContainer.from_docs_list(docs)
+            _filter_graph_container_by_vertices_inplace(
+                graph, allowed_vertex_names=self._allowed_vertex_names
+            )
             return CastBatchResult(graph=graph, failures=[])
 
         raw = await asyncio.gather(
@@ -340,6 +262,9 @@ class Caster:
         await self._persist_row_failures(failures)
 
         graph = GraphContainer.from_docs_list(docs)
+        _filter_graph_container_by_vertices_inplace(
+            graph, allowed_vertex_names=self._allowed_vertex_names
+        )
         return CastBatchResult(graph=graph, failures=failures)
 
     # ------------------------------------------------------------------
@@ -540,6 +465,7 @@ class Caster:
         data_source_registry: DataSourceRegistry,
         conn_conf: DBConfig,
         ingestion_params: IngestionParams | None = None,
+        allowed_resource_names: set[str] | None = None,
     ):
         """Ingest data from data sources in a registry.
 
@@ -565,6 +491,11 @@ class Caster:
 
         tasks: list[AbstractDataSource] = []
         for resource_name in self.ingestion_model._resources.keys():
+            if (
+                allowed_resource_names is not None
+                and resource_name not in allowed_resource_names
+            ):
+                continue
             data_sources = data_source_registry.get_data_sources(resource_name)
             if data_sources:
                 logger.info(
@@ -622,10 +553,14 @@ class Caster:
         db_flavor = target_db_config.connection_type
         self.schema.db_profile.db_flavor = db_flavor
         self.schema.finish_init()
+
+        allowed_resource_names = self._resolve_ingestion_scope(ingestion_params)
+
         self.ingestion_model.finish_init(
             self.schema.core_schema,
             strict_references=ingestion_params.strict_references,
             dynamic_edge_feedback=ingestion_params.dynamic_edges,
+            allowed_vertex_names=self._allowed_vertex_names,
         )
 
         registry = RegistryBuilder(self.schema, self.ingestion_model).build(
@@ -640,12 +575,50 @@ class Caster:
                 data_source_registry=registry,
                 conn_conf=target_db_config,
                 ingestion_params=ingestion_params,
+                allowed_resource_names=allowed_resource_names,
             )
         )
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _resolve_ingestion_scope(
+        self, ingestion_params: IngestionParams
+    ) -> set[str] | None:
+        """Resolve and validate resource/vertex filters for ingestion.
+
+        Resolution order is resources first, then vertices.
+        """
+        if ingestion_params.resources is not None:
+            known_resources = set(self.ingestion_model._resources.keys())
+            requested_resources = set(ingestion_params.resources)
+            unknown_resources = requested_resources - known_resources
+            if unknown_resources:
+                raise ValueError(
+                    "Unknown resources in ingestion_params.resources: "
+                    + ", ".join(sorted(unknown_resources))
+                )
+            allowed_resource_names: set[str] | None = requested_resources
+        else:
+            allowed_resource_names = None
+
+        if ingestion_params.vertices is not None:
+            known_vertices = {
+                v.name for v in self.schema.core_schema.vertex_config.vertices
+            }
+            requested_vertices = set(ingestion_params.vertices)
+            unknown_vertices = requested_vertices - known_vertices
+            if unknown_vertices:
+                raise ValueError(
+                    "Unknown vertices in ingestion_params.vertices: "
+                    + ", ".join(sorted(unknown_vertices))
+                )
+            self._allowed_vertex_names = requested_vertices
+        else:
+            self._allowed_vertex_names = None
+
+        return allowed_resource_names
 
     def _make_db_writer(self) -> DBWriter:
         """Create a :class:`DBWriter` from the current ingestion params."""

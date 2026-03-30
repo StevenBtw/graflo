@@ -776,6 +776,38 @@ bindings = Bindings(
 )
 ```
 
+### Runtime proxy wiring (no secrets in YAML)
+
+Once your `bindings` block contains `connector_connection` proxy labels, you must
+register the real runtime connection config under each `conn_proxy` and bind the
+manifest connectors to that proxy:
+
+```python
+from graflo.hq.connection_provider import (
+    InMemoryConnectionProvider,
+    PostgresGeneralizedConnConfig,
+)
+from graflo.hq import IngestionParams
+
+provider = InMemoryConnectionProvider()
+provider.register_generalized_config(
+    conn_proxy="postgres_source",
+    config=PostgresGeneralizedConnConfig(config=postgres_conf),
+)
+provider.bind_from_bindings(bindings=bindings)
+
+engine.define_and_ingest(
+    manifest=manifest.model_copy(update={"bindings": bindings}),
+    target_db_config=conn_conf,
+    ingestion_params=IngestionParams(clear_data=True),
+    recreate_schema=False,
+    connection_provider=provider,
+)
+```
+
+For the common single-proxy case you can replace the `register_generalized_config(...)` +
+`bind_from_bindings(...)` steps with `provider.bind_single_config_for_bindings(...)`.
+
 ## Viewing Results in Graph Database Web Interfaces
 
 After successful ingestion, you can explore your graph data using each database's web interface. The default ports and access information are listed below. Check the corresponding `.env` files in the `docker/` directories for custom port configurations.

@@ -172,6 +172,16 @@ caster = Caster(schema=schema, ingestion_model=ingestion_model)
 ingestion_params = IngestionParams(
     batch_size=1000,  # Process 1000 items per batch
     clear_data=False,
+    # Optional: restrict ingestion scope.
+    # `resources` limits which logical resources (from the manifest) are processed.
+    # `vertices` is an allow-list of vertex types to ingest.
+    #
+    # Implementation detail: the allow-list is applied early in the runtime actor
+    # pipeline (not just as a late DB-write filter). Disallowed vertex types are
+    # not extracted/assembled, and edges are only emitted when both endpoints
+    # are allowed.
+    resources=["your_resource_name"],
+    vertices=["your_vertex_name"],
 )
 
 asyncio.run(

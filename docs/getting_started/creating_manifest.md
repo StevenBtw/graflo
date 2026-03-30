@@ -91,6 +91,30 @@ The block can be left empty in-file (`bindings: {}`) and supplied at runtime for
 
 Use `bindings` for **where data comes from** (and optionally **which proxy label** supplies runtime credentials for each SQL/SPARQL connector).
 
+### Runtime proxy wiring (example)
+
+The manifest contains proxy labels only. At runtime you register the real connection config and bind manifest connectors to those proxy labels:
+
+```python
+from graflo.hq.connection_provider import (
+    InMemoryConnectionProvider,
+    PostgresGeneralizedConnConfig,
+)
+
+provider = InMemoryConnectionProvider()
+provider.bind_single_config_for_bindings(
+    bindings=bindings,
+    conn_proxy="postgres_source",
+    config=PostgresGeneralizedConnConfig(config=postgres_conf),
+)
+
+engine.define_and_ingest(
+    manifest=manifest,
+    target_db_config=target_db_config,
+    connection_provider=provider,
+)
+```
+
 ## Authoring tips
 
 - Keep resource names unique across `ingestion_model.resources`.

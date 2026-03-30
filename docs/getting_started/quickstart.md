@@ -135,6 +135,30 @@ Here `schema` defines the logical graph, while `ingestion_model` defines resourc
 
 For SQL and SPARQL sources, add **`connector_connection`**: a list of `{"connector": "<connector name or hash>", "conn_proxy": "<label>"}`. At runtime, register each `conn_proxy` on an `InMemoryConnectionProvider` (or your own `ConnectionProvider`) with `GeneralizedConnConfig`. `GraphEngine` / `ResourceMapper` call `bind_connector_to_conn_proxy` when building bindings from Postgres or RDF workflows so HQ and the manifest stay aligned.
 
+### Single-DB quick path (one proxy label)
+
+When all SQL connectors use the same `conn_proxy`, you can wire the runtime config in one call:
+
+```python
+from graflo.hq.connection_provider import (
+    InMemoryConnectionProvider,
+    PostgresGeneralizedConnConfig,
+)
+
+provider = InMemoryConnectionProvider()
+provider.bind_single_config_for_bindings(
+    bindings=bindings,
+    conn_proxy="postgres_source",
+    config=PostgresGeneralizedConnConfig(config=postgres_conf),
+)
+
+engine.define_and_ingest(
+    manifest=manifest,
+    target_db_config=conn_conf,
+    connection_provider=provider,
+)
+```
+
 The `ingest()` method takes:
 - `target_db_config`: Target graph database configuration (where to write the graph)
 - `bindings`: Source data connectors (where to read data from - files or database tables)

@@ -123,13 +123,49 @@ class InMemoryConnectionProvider(BaseModel):
 
     def bind_from_bindings(self, *, bindings: Bindings) -> None:
         """Populate ``proxy_by_connector_hash`` from the contract bindings."""
-        for entry in bindings.connector_connection_bindings:
-            for connector in bindings.connectors:
-                if (
-                    entry.connector == connector.hash
-                    or entry.connector == connector.name
-                ):
-                    self.proxy_by_connector_hash[connector.hash] = entry.conn_proxy
+        for connector in bindings.connectors:
+            proxy = bindings.get_conn_proxy_for_connector(connector)
+            if proxy is not None:
+                self.proxy_by_connector_hash[connector.hash] = proxy
+
+    def bind_single_config_for_bindings(
+        self,
+        *,
+        bindings: Bindings,
+        conn_proxy: str,
+        config: GeneralizedConnConfig,
+    ) -> None:
+        """Bind one generalized config to all connectors in bindings.
+
+        This is intended for the common case where a single source DB
+        (or single generalized API endpoint) supplies all SQL/SPARQL connectors
+        in the manifest.
+
+        Raises:
+            ValueError: if bindings use multiple different ``conn_proxy`` labels.
+        """
+        used_proxies: set[str] = set()
+        for connector in bindings.connectors:
+            proxy = bindings.get_conn_proxy_for_connector(connector)
+            if proxy is not None:
+                used_proxies.add(proxy)
+
+        if not used_proxies:
+            raise ValueError(
+                "No connector_connection mappings found in bindings; "
+                "expected connector -> conn_proxy rows."
+            )
+
+        if used_proxies != {conn_proxy}:
+            used = ", ".join(sorted(used_proxies))
+            raise ValueError(
+                f"Expected all connector_connection mappings to use conn_proxy='{conn_proxy}', "
+                f"but found proxies: {used}. For multi-proxy setups, bind explicitly "
+                "with register_generalized_config(...) and bind_from_bindings(...)."
+            )
+
+        self.register_generalized_config(conn_proxy=conn_proxy, config=config)
+        self.bind_from_bindings(bindings=bindings)
 
     def get_generalized_conn_config(
         self, connector: ResourceConnector
