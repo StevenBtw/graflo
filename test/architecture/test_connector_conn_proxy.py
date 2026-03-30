@@ -79,3 +79,147 @@ def test_provider_resolves_connector_based_config_for_multiple_resources() -> No
     assert cfg2 is not None
     assert cfg1.uri == pg_cfg.uri
     assert cfg2.uri == pg_cfg.uri
+
+
+def test_provider_bind_from_bindings_supports_resource_alias() -> None:
+    # connector.name omitted; manifests can use connector.resource_name as alias.
+    connector = TableConnector(
+        table_name="t1",
+        schema_name="public",
+        resource_name="people",
+    )
+    pg_cfg = PostgresConfig(
+        uri="postgresql://localhost:5432/db",
+        username="u",
+        password="p",
+        database="db",
+        schema_name="public",
+    )
+
+    bindings = Bindings(
+        connectors=[connector],
+        connector_connection=[{"connector": "people", "conn_proxy": "pg"}],
+    )
+
+    provider = InMemoryConnectionProvider()
+    provider.register_generalized_config(
+        conn_proxy="pg",
+        config=PostgresGeneralizedConnConfig(config=pg_cfg),
+    )
+    provider.bind_from_bindings(bindings=bindings)
+
+    cfg = provider.get_postgres_config(resource_name="r1", connector=connector)
+    assert cfg is not None
+    assert cfg.uri == pg_cfg.uri
+
+
+def test_provider_bind_from_bindings_resolves_by_connector_name() -> None:
+    connector = TableConnector(table_name="t1", schema_name="public", name="c1")
+    pg_cfg = PostgresConfig(
+        uri="postgresql://localhost:5432/db",
+        username="u",
+        password="p",
+        database="db",
+        schema_name="public",
+    )
+
+    bindings = Bindings(
+        connectors=[connector],
+        connector_connection=[{"connector": "c1", "conn_proxy": "pg"}],
+    )
+
+    provider = InMemoryConnectionProvider()
+    provider.register_generalized_config(
+        conn_proxy="pg",
+        config=PostgresGeneralizedConnConfig(config=pg_cfg),
+    )
+    provider.bind_from_bindings(bindings=bindings)
+
+    cfg = provider.get_postgres_config(resource_name="r1", connector=connector)
+    assert cfg is not None
+    assert cfg.uri == pg_cfg.uri
+
+
+def test_provider_bind_from_bindings_resolves_by_connector_hash() -> None:
+    connector = TableConnector(table_name="t1", schema_name="public", name="c1")
+    pg_cfg = PostgresConfig(
+        uri="postgresql://localhost:5432/db",
+        username="u",
+        password="p",
+        database="db",
+        schema_name="public",
+    )
+
+    bindings = Bindings(
+        connectors=[connector],
+        connector_connection=[{"connector": connector.hash, "conn_proxy": "pg"}],
+    )
+
+    provider = InMemoryConnectionProvider()
+    provider.register_generalized_config(
+        conn_proxy="pg",
+        config=PostgresGeneralizedConnConfig(config=pg_cfg),
+    )
+    provider.bind_from_bindings(bindings=bindings)
+
+    cfg = provider.get_postgres_config(resource_name="r1", connector=connector)
+    assert cfg is not None
+    assert cfg.uri == pg_cfg.uri
+
+
+def test_bind_single_config_for_bindings_binds_and_validates() -> None:
+    connector = TableConnector(
+        table_name="t1",
+        schema_name="public",
+        resource_name="people",
+    )
+    pg_cfg = PostgresConfig(
+        uri="postgresql://localhost:5432/db",
+        username="u",
+        password="p",
+        database="db",
+        schema_name="public",
+    )
+
+    bindings = Bindings(
+        connectors=[connector],
+        connector_connection=[{"connector": "people", "conn_proxy": "pg"}],
+    )
+
+    provider = InMemoryConnectionProvider()
+    provider.bind_single_config_for_bindings(
+        bindings=bindings,
+        conn_proxy="pg",
+        config=PostgresGeneralizedConnConfig(config=pg_cfg),
+    )
+
+    cfg = provider.get_postgres_config(resource_name="r1", connector=connector)
+    assert cfg is not None
+    assert cfg.uri == pg_cfg.uri
+
+    # Mismatch between helper conn_proxy and manifest conn_proxy should fail fast.
+    bindings_mismatch = Bindings(
+        connectors=[
+            TableConnector(
+                table_name="t1",
+                schema_name="public",
+                resource_name="people",
+            ),
+            TableConnector(
+                table_name="t2",
+                schema_name="public",
+                resource_name="products",
+            ),
+        ],
+        connector_connection=[
+            {"connector": "people", "conn_proxy": "pg"},
+            {"connector": "products", "conn_proxy": "pg2"},
+        ],
+    )
+    provider_mismatch = InMemoryConnectionProvider()
+    with pytest.raises(ValueError, match="Expected all connector_connection mappings"):
+        provider_mismatch.bind_single_config_for_bindings(
+            bindings=bindings_mismatch,
+            conn_proxy="pg",
+            config=PostgresGeneralizedConnConfig(config=pg_cfg),
+        )

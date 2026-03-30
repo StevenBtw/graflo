@@ -1,9 +1,4 @@
-db_profile:
-    db_flavor: tigergraph
-    vertex_storage_names:
-        products: products
-        users: users
-graph:
+core_schema:
     edge_config:
         edges:
         -   relation: follows
@@ -52,5 +47,10 @@ graph:
             identity:
             -   id
             name: users
+db_profile:
+    db_flavor: tigergraph
+    vertex_storage_names:
+        products: products
+        users: users
 metadata:
     name: accounting
