@@ -40,7 +40,7 @@ from graflo.hq.registry_builder import RegistryBuilder
 from graflo.util.chunker import ChunkerType
 from graflo.architecture.contract.bindings import Bindings
 from graflo.hq.connection_provider import ConnectionProvider, EmptyConnectionProvider
-from graflo.hq.caster_params import (
+from graflo.hq.ingestion_parameters import (
     CastBatchResult,
     IngestionParams,
     RowCastFailure,

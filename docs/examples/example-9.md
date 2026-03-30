@@ -58,6 +58,7 @@ provider.bind_single_config_for_bindings(
 ## Full script
 
 See:
-- `graflo/examples/9-connector-connection-proxy/explicit_proxy_binding.py`
-- `graflo/examples/9-connector-connection-proxy/README.md`
+
+- `examples/9-connector-connection-proxy/explicit_proxy_binding.py`
+- `examples/9-connector-connection-proxy/README.md`
 

@@ -28,6 +28,7 @@ Database connection and management components:
   - [Utilities](db/arango/util.md): ArangoDB-specific utility functions
 - **[Neo4j](db/neo4j/__init__.md)**:
   - [Connection](db/neo4j/conn.md): Neo4j-specific connection implementation
+- **[Cypher helpers](db/cypher/__init__.md)** — Shared Cypher utilities ([escape](db/cypher/escape.md), [relationship MERGE](db/cypher/rel_merge.md))
 - **[FalkorDB](db/falkordb/__init__.md)**:
   - [Connection](db/falkordb/conn.md): FalkorDB-specific connection implementation
 - **[TigerGraph](db/tigergraph/__init__.md)**:
@@ -48,6 +49,7 @@ Database connection and management components:
 Main graflo functionality:
 
 - **[Caster](hq/caster.md)**: Main data ingestion and transformation engine
+- **[Ingestion parameters](hq/ingestion_parameters.md)**: `IngestionParams`, row-error policy types, and batch cast results (`CastBatchResult`, …)
 - **[Data Sources](data_source/index.md)**: Data source abstraction layer (files, APIs, SQL, in-memory)
 - **[Ontology](onto.md)**: Core data types and enums
 
