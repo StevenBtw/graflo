@@ -12,7 +12,7 @@ from graflo.architecture.schema import (
     Schema,
 )
 from graflo.architecture.schema.vertex import Vertex, VertexConfig, Field
-from graflo.db.connection import ArangoConfig
+from graflo.db.connection import ArangoConfig, Neo4jConfig
 from graflo.hq.db_writer import DBWriter
 from graflo.onto import DBType
 
@@ -101,7 +101,8 @@ def test_resolve_blank_edges_prefers_identity_join_over_zip():
         linear=[],
     )
 
-    writer._resolve_blank_edges(gc)
+    conn_conf = Neo4jConfig(uri="bolt://localhost:7687", username="u", password="p")
+    writer._resolve_blank_edges(gc, conn_conf)
     edge_id = ("blank_v", "target_v", None)
     pairs = gc.edges[edge_id]
 

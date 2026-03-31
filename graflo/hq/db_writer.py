@@ -26,6 +26,11 @@ logger = logging.getLogger(__name__)
 class DBWriter:
     """Push :class:`GraphContainer` data to the target graph database.
 
+    The orchestrator (e.g. :class:`Caster`) must initialize ``schema`` and
+    ``ingestion_model`` for the target database (``db_profile.db_flavor``,
+    :meth:`Schema.finish_init`, :meth:`IngestionModel.finish_init`) before
+    calling :meth:`write`; this class does not repeat that work on every batch.
+
     Attributes:
         schema: Schema configuration providing vertex/edge metadata.
         dry: When ``True`` no database mutations are performed.
@@ -39,14 +44,13 @@ class DBWriter:
         *,
         dry: bool = False,
         max_concurrent: int = 1,
-        dynamic_edges: bool = False,
     ):
         self.schema = schema
         self.ingestion_model = ingestion_model
         self.dry = dry
         self.max_concurrent = max_concurrent
-        self.dynamic_edges = dynamic_edges
         self._schema_db_aware: SchemaDBAware | None = None
+        self._schema_db_aware_flavor: DBType | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -64,16 +68,10 @@ class DBWriter:
             *gc* is mutated in-place: blank-vertex keys are updated and blank
             edges are extended after the vertex round-trip.
         """
-        self.schema.finish_init()
-        self.ingestion_model.finish_init(
-            self.schema.core_schema,
-            dynamic_edge_feedback=self.dynamic_edges,
-        )
-        self._schema_db_aware = self.schema.resolve_db_aware(conn_conf.connection_type)
         resource = self.ingestion_model.fetch_resource(resource_name)
 
         await self._push_vertices(gc, conn_conf)
-        self._resolve_blank_edges(gc)
+        self._resolve_blank_edges(gc, conn_conf)
         await self._enrich_extra_weights(gc, conn_conf, resource)
         await self._push_edges(gc, conn_conf)
 
@@ -83,7 +81,7 @@ class DBWriter:
 
     async def _push_vertices(self, gc: GraphContainer, conn_conf: DBConfig) -> None:
         """Upsert all vertex collections in *gc*, resolving blank nodes."""
-        vc = self._require_db_aware().vertex_config
+        vc = self._db_aware_for(conn_conf).vertex_config
         semaphore = asyncio.Semaphore(self.max_concurrent)
 
         async def _push_one(vcol: str, data: list[dict]):
@@ -119,7 +117,7 @@ class DBWriter:
         self, vcol: str, data: list[dict], conn_conf: DBConfig
     ) -> None:
         """Assign deterministic in-memory IDs to blank vertices before persistence."""
-        vc = self._require_db_aware().vertex_config
+        vc = self._db_aware_for(conn_conf).vertex_config
         identity_fields = vc.identity_fields(vcol)
         default_field = "_key" if conn_conf.connection_type == DBType.ARANGO else "id"
         preferred_field = identity_fields[0] if identity_fields else default_field
@@ -136,9 +134,9 @@ class DBWriter:
     # Blank-edge resolution
     # ------------------------------------------------------------------
 
-    def _resolve_blank_edges(self, gc: GraphContainer) -> None:
+    def _resolve_blank_edges(self, gc: GraphContainer, conn_conf: DBConfig) -> None:
         """Extend edge lists for blank vertices after their keys are resolved."""
-        vc = self._require_db_aware().vertex_config
+        vc = self._db_aware_for(conn_conf).vertex_config
         for vcol in vc.blank_vertices:
             for edge_id, _edge in self.schema.core_schema.edge_config.items():
                 vfrom, vto, _relation = edge_id
@@ -181,7 +179,7 @@ class DBWriter:
         self, gc: GraphContainer, conn_conf: DBConfig, resource
     ) -> None:
         """Fetch extra-weight vertex data from the DB and attach to edges."""
-        vc = self._require_db_aware().vertex_config
+        vc = self._db_aware_for(conn_conf).vertex_config
 
         def _sync():
             with ConnectionManager(connection_config=conn_conf) as db:
@@ -216,7 +214,7 @@ class DBWriter:
 
     async def _push_edges(self, gc: GraphContainer, conn_conf: DBConfig) -> None:
         """Insert all edges in *gc*."""
-        schema_db = self._require_db_aware()
+        schema_db = self._db_aware_for(conn_conf)
         vc = schema_db.vertex_config
         ec = schema_db.edge_config
         semaphore = asyncio.Semaphore(self.max_concurrent)
@@ -277,10 +275,12 @@ class DBWriter:
             ]
         )
 
-    def _require_db_aware(self) -> SchemaDBAware:
-        if self._schema_db_aware is None:
-            self.schema.finish_init()
-            self._schema_db_aware = self.schema.resolve_db_aware()
+    def _db_aware_for(self, conn_conf: DBConfig) -> SchemaDBAware:
+        """Return a cached :class:`SchemaDBAware` for *conn_conf*'s DB flavor."""
+        flavor = conn_conf.connection_type
+        if self._schema_db_aware is None or self._schema_db_aware_flavor != flavor:
+            self._schema_db_aware = self.schema.resolve_db_aware(flavor)
+            self._schema_db_aware_flavor = flavor
         return self._schema_db_aware
 
     def _project_edge_docs_for_db(

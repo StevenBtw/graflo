@@ -9,6 +9,12 @@ Key Components:
     - FileConnector: Connector matching for file discovery
     - Connectors: Collection of file connectors for different resources
 
+Ingestion paths (:meth:`ingest`, :meth:`ingest_data_sources`, :meth:`process_resource`,
+:meth:`process_data_source`, queue workers) all route batches through
+:meth:`process_batch` → :meth:`cast_normal_resource`, which loads the named
+``Resource`` from the :class:`~graflo.architecture.contract.declarations.ingestion_model.IngestionModel`
+and invokes :meth:`~graflo.architecture.contract.declarations.resource.Resource.__call__` per row.
+
 Example:
     >>> caster = Caster(schema=schema)
     >>> caster.ingest(path="data/", conn_conf=db_config)
@@ -314,9 +320,8 @@ class Caster:
         """
         actual_resource_name = resource_name or data_source.resource_name
 
-        limit = getattr(data_source, "_pattern_limit", None)
-        if limit is None:
-            limit = self.ingestion_params.max_items
+        # Same semantics as AbstractDataSource.iter_batches(limit=...).
+        limit = self.ingestion_params.max_items
 
         for batch in data_source.iter_batches(
             batch_size=self.ingestion_params.batch_size, limit=limit
@@ -632,5 +637,4 @@ class Caster:
             ingestion_model=self.ingestion_model,
             dry=self.ingestion_params.dry,
             max_concurrent=max_concurrent,
-            dynamic_edges=self.ingestion_params.dynamic_edges,
         )

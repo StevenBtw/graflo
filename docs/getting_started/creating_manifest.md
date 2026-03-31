@@ -74,6 +74,7 @@ Defines ingestion behavior.
 
 - `resources`: named pipelines (`name`) with ordered actor steps
 - `transforms`: reusable named transforms as a **list** (each entry must define `name`) and referenced from resources via `transform.call.use`
+- Optional per-resource flags include **`drop_trivial_input_fields`** (default `false`): when `true`, top-level `null` or `""` fields are removed from each row before the pipeline—handy for sparse wide tables without extra transforms (shallow only; nested objects are unchanged).
 
 Use `ingestion_model` for **how source records become vertices/edges**.
 
@@ -82,10 +83,10 @@ Use `ingestion_model` for **how source records become vertices/edges**.
 Defines source wiring (`Bindings`).
 
 - **`connectors`**: list of `FileConnector`, `TableConnector`, or `SparqlConnector` entries (where each row points at paths, tables, or RDF/SPARQL sources).
-- **`resource_connector`**: list of `{"resource": "<ingestion resource name>", "connector": "<connector name or reference>"}` rows linking `IngestionModel.resources[*].name` to a connector.
-- **`connector_connection`** (optional): list of `{"connector": "<name|hash|resource alias>", "conn_proxy": "<label>"}` rows. This keeps manifests **non-secret**: only proxy *names* appear in YAML; runtime code registers each `conn_proxy` on a `ConnectionProvider` with the real `GeneralizedConnConfig` (PostgreSQL, SPARQL, etc.).
+- **`resource_connector`**: list of `{"resource": "<ingestion resource name>", "connector": "<connector name or hash>"}` rows linking `IngestionModel.resources[*].name` to a connector. The same `resource` may appear on **multiple rows** with different `connector` values (several physical sources for one pipeline).
+- **`connector_connection`** (optional): list of `{"connector": "<connector name or hash>", "conn_proxy": "<label>"}` rows. This keeps manifests **non-secret**: only proxy *names* appear in YAML; runtime code registers each `conn_proxy` on a `ConnectionProvider` with the real `GeneralizedConnConfig` (PostgreSQL, SPARQL, etc.).
 
-Connector references in `resource_connector` / `connector_connection` must match a connector `name` (or resolve via hash / resource alias as documented in `Bindings`). Duplicate connector names and conflicting resource or proxy mappings are rejected at validation time.
+Connector references in `resource_connector` / `connector_connection` must match a connector’s declared **`name`** or canonical **`hash`**. Ingestion **resource names** are not connector references (they can map 1→*n*). Duplicate connector `name` values and conflicting `conn_proxy` mappings for the same connector hash are rejected at validation time.
 
 The block can be left empty in-file (`bindings: {}`) and supplied at runtime for env-specific deployments.
 
