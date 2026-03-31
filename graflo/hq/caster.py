@@ -631,5 +631,4 @@ class Caster:
             ingestion_model=self.ingestion_model,
             dry=self.ingestion_params.dry,
             max_concurrent=max_concurrent,
-            dynamic_edges=self.ingestion_params.dynamic_edges,
         )

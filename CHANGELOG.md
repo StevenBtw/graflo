@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.7.10] - 2026-04-01
+
+### Changed
+
+- **`DBWriter`**: No longer calls `Schema.finish_init()` or `IngestionModel.finish_init()` on every `write()`. The orchestrator (e.g. **`Caster.ingest`**) is responsible for initializing schema and ingestion model for the target DB before writes. This avoids redundant work on each batch and prevents the writer from resetting ingestion flags (`strict_references`, `allowed_vertex_names`) that **`Caster`** had already applied.
+- **`DBWriter`**: Reuses a cached **`SchemaDBAware`** projection for a given connection DB type instead of rebuilding it on every `write()`.
+
+### Breaking
+
+- **`DBWriter`**: The **`dynamic_edges`** constructor argument was removed (it only drove the redundant `finish_init` call). Configure dynamic edge behavior via **`Caster`** / **`IngestionParams.dynamic_edges`** and ingestion **`finish_init`** as before.
+
 ## [1.7.9] - 2026-03-31
 
 ### Added
