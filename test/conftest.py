@@ -528,7 +528,15 @@ def resource_ticker():
             rename:
                 ticker: oftic
     -   vertex: ticker
-    - vertex: feature
+    -   vertex: feature
+    -   source: ticker
+        target: feature
+        attributes:
+        -   t_obs
+        vertex_weights:
+        -   name: feature
+            fields:
+            -   name
     """)
 
 

@@ -47,11 +47,10 @@ schema:
                 -   -   source
                     -   target
                     -   publication@_id
-                weights:
-                    direct:
-                    -   publication@_id
-                    -   obs_date
-                    -   t_window
+                attributes:
+                -   publication@_id
+                -   obs_date
+                -   t_window
             -   source: mention
                 target: entity
             -   source: entity
@@ -190,9 +189,8 @@ ingestion_model:
             match_source: triple_index
             target: mention
             match_target: triple
-            weights:
-                direct:
-                -   _role
+            attributes:
+            -   _role
     -   name: communities
         apply:
         -   source: entity

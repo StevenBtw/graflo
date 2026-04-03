@@ -50,13 +50,9 @@ schema:
                 target: ticker
             -   source: analyst
                 target: agency
-                weights:
-                    vertices:
-                    -   name: publication
-                        keep_vertex_name: false
-                        fields:
-                        -   datetime_review
-                        -   datetime_announce
+                attributes:
+                -   datetime_review
+                -   datetime_announce
             -   source: analyst
                 target: publication
             -   source: publication
@@ -129,4 +125,12 @@ ingestion_model:
                     IRECCD: irec
                     ITEXT: itext
         -   vertex: publication
+        -   source: analyst
+            target: agency
+            vertex_weights:
+            -   name: publication
+                keep_vertex_name: false
+                fields:
+                -   datetime_review
+                -   datetime_announce
 bindings: {}

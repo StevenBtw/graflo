@@ -40,11 +40,13 @@ from graflo.architecture.graph_types import (
     EdgeId,
     EncodingType,
     GraphEntity,
+    Weight,
 )
 from graflo.architecture.schema.edge import Edge, EdgeConfig
 from graflo.architecture.schema.vertex import VertexConfig
 from graflo.onto import DBType
 
+from .edge_derivation_registry import EdgeDerivationRegistry
 from .transform import ProtoTransform
 
 if TYPE_CHECKING:
@@ -144,6 +146,39 @@ class EdgeInferSpec(ConfigBaseModel):
         )
 
 
+class ResourceExtraWeightEntry(ConfigBaseModel):
+    """Schema edge plus optional vertex-derived weight rules for DB enrichment."""
+
+    edge: Edge
+    vertex_weights: list[Weight] = PydanticField(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_yaml(cls, data: Any) -> Any:
+        if data is None:
+            return data
+        if isinstance(data, Edge):
+            return {"edge": data, "vertex_weights": []}
+        if not isinstance(data, dict):
+            raise TypeError(
+                f"extra_weights item must be dict or Edge, got {type(data)}"
+            )
+        d = dict(data)
+        vw_raw = d.pop("vertex_weights", None) or []
+        if not isinstance(vw_raw, list):
+            vw_raw = [vw_raw]
+        v_w = [Weight.model_validate(x) for x in vw_raw]
+        if "edge" in d and isinstance(d["edge"], dict):
+            edge = Edge.model_validate(dict(d.pop("edge")))
+            if d:
+                raise ValueError(
+                    f"extra_weights entry has unexpected keys with 'edge': {sorted(d)}"
+                )
+            return {"edge": edge, "vertex_weights": v_w}
+        edge = Edge.model_validate(d)
+        return {"edge": edge, "vertex_weights": v_w}
+
+
 class Resource(ConfigBaseModel):
     """Resource configuration and processing.
 
@@ -179,9 +214,9 @@ class Resource(ConfigBaseModel):
         default_factory=list,
         description="List of collection names to merge when writing to the graph.",
     )
-    extra_weights: list[Edge] = PydanticField(
+    extra_weights: list[ResourceExtraWeightEntry] = PydanticField(
         default_factory=list,
-        description="Additional edge weight configurations for this resource.",
+        description="Additional edge attribute / vertex-weight enrichment for this resource.",
     )
     types: dict[str, str] = PydanticField(
         default_factory=dict,
@@ -222,6 +257,7 @@ class Resource(ConfigBaseModel):
     _edge_config: EdgeConfig = PrivateAttr()
     _executor: ActorExecutor = PrivateAttr()
     _initialized: bool = PrivateAttr(default=False)
+    _edge_derivation_registry: EdgeDerivationRegistry | None = PrivateAttr(default=None)
 
     @model_validator(mode="after")
     def _build_root_and_types(self) -> Resource:
@@ -394,11 +430,15 @@ class Resource(ConfigBaseModel):
 
         from graflo.architecture.pipeline.runtime.actor import ActorInitContext
 
+        edge_derivation_registry = EdgeDerivationRegistry()
+        object.__setattr__(self, "_edge_derivation_registry", edge_derivation_registry)
+
         logger.debug("total resource actor count : %s", self.root.count())
         init_ctx = ActorInitContext(
             vertex_config=runtime_vertex_config,
             edge_config=self._edge_config,
             transforms=transforms,
+            edge_derivation=edge_derivation_registry,
             allowed_vertex_names=allowed_vertex_names,
             infer_edges=self.infer_edges,
             infer_edge_only={spec.edge_id for spec in self.infer_edge_only},
@@ -423,8 +463,11 @@ class Resource(ConfigBaseModel):
 
         logger.debug("total resource actor count (after finit): %s", self.root.count())
 
-        for e in self.extra_weights:
-            e.finish_init(vertex_config)
+        reg = self._edge_derivation_registry
+        for entry in self.extra_weights:
+            entry.edge.finish_init(vertex_config)
+            if reg is not None and entry.vertex_weights:
+                reg.merge_vertex_weights(entry.edge.edge_id, entry.vertex_weights)
 
     def __call__(self, doc: dict) -> defaultdict[GraphEntity, list]:
         """Process a document through the resource pipeline.

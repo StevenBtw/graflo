@@ -183,10 +183,11 @@ class DBWriter:
 
         def _sync():
             with ConnectionManager(connection_config=conn_conf) as db:
-                for edge in resource.extra_weights:
-                    if edge.weights is None:
+                for entry in resource.extra_weights:
+                    edge = entry.edge
+                    if not entry.vertex_weights:
                         continue
-                    for weight in edge.weights.vertices:
+                    for weight in entry.vertex_weights:
                         if weight.name not in vc.vertex_set:
                             logger.error(f"{weight.name} not a valid vertex")
                             continue

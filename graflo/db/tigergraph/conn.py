@@ -1701,7 +1701,10 @@ class TigerGraphConnection(Connection):
         """Deep-copy edge with TigerGraph-effective weights for GSQL (non-mutating on schema)."""
         ew = ec_db.effective_weights(edge)
         edge_copy = edge.model_copy(deep=True)
-        edge_copy.weights = ew
+        if ew is not None:
+            edge_copy.attributes = [f.model_copy(deep=True) for f in ew.direct]
+        else:
+            edge_copy.attributes = []
         return edge_copy
 
     def _format_edge_attributes(
@@ -1716,14 +1719,14 @@ class TigerGraphConnection(Connection):
         Returns:
             str: Formatted attribute string (e.g., "    date STRING,\n    relation STRING")
         """
-        if not edge.weights or not edge.weights.direct:
+        if not edge.attributes:
             return ""
 
         if exclude_fields is None:
             exclude_fields = set()
 
         attr_parts = []
-        for field in edge.weights.direct:
+        for field in edge.attributes:
             field_name = field.name
             if field_name not in exclude_fields:
                 field_type = self._get_tigergraph_type(field.type)
@@ -1765,32 +1768,18 @@ class TigerGraphConnection(Connection):
         indexed_field_names = self._edge_identity_discriminator_fields(edge)
 
         # IMPORTANT: In TigerGraph, discriminator fields MUST also be edge attributes.
-        # If an indexed field is not in weights.direct, we need to add it.
-        # Initialize weights if not present
-        if edge.weights is None:
-            from graflo.architecture.schema.edge import WeightConfig, Field
+        # If an indexed field is not in attributes, we need to add it.
+        existing_weight_names = {f.name for f in edge.attributes}
 
-            edge.weights = WeightConfig()
-
-        # Type assertion: weights is guaranteed to be WeightConfig after assignment
-        if edge.weights is None:
-            raise RuntimeError("weights should be initialized")
-        # Get existing weight field names
-        existing_weight_names = set()
-        if edge.weights.direct:
-            existing_weight_names = {field.name for field in edge.weights.direct}
-
-        # Add any indexed fields that are missing from weights
+        # Add any indexed fields that are missing from attributes
         for field_name in indexed_field_names:
             if field_name not in existing_weight_names:
-                # Add the field to weights with STRING type (default)
                 from graflo.architecture.schema.edge import Field
 
-                edge.weights.direct.append(
-                    Field(name=field_name, type=FieldType.STRING)
-                )
+                edge.attributes.append(Field(name=field_name, type=FieldType.STRING))
+                existing_weight_names.add(field_name)
                 logger.info(
-                    f"Added indexed field '{field_name}' to edge weights for discriminator compatibility"
+                    f"Added indexed field '{field_name}' to edge attributes for discriminator compatibility"
                 )
 
         # Format edge attributes, excluding discriminator fields (they're in DISCRIMINATOR clause)
@@ -1804,8 +1793,8 @@ class TigerGraphConnection(Connection):
 
         # Get field types for discriminator fields
         field_types = {}
-        if edge.weights and edge.weights.direct:
-            for field in edge.weights.direct:
+        if edge.attributes:
+            for field in edge.attributes:
                 field_types[field.name] = self._get_tigergraph_type(field.type)
 
         # Use sanitized dbname for schema names when available
@@ -1883,25 +1872,17 @@ class TigerGraphConnection(Connection):
         # Collect identity discriminator fields (same logic as _get_edge_add_statement)
         indexed_field_names = self._edge_identity_discriminator_fields(first_edge)
 
-        # Ensure indexed fields are in weights (same logic as _get_edge_add_statement)
-        if first_edge.weights is None:
-            from graflo.architecture.schema.edge import WeightConfig
-
-            first_edge.weights = WeightConfig()
-
-        if first_edge.weights is None:
-            raise RuntimeError("weights should be initialized")
-        existing_weight_names = set()
-        if first_edge.weights.direct:
-            existing_weight_names = {field.name for field in first_edge.weights.direct}
+        # Ensure indexed fields are in attributes (same logic as _get_edge_add_statement)
+        existing_weight_names = {f.name for f in first_edge.attributes}
 
         for field_name in indexed_field_names:
             if field_name not in existing_weight_names:
                 from graflo.architecture.schema.edge import Field
 
-                first_edge.weights.direct.append(
+                first_edge.attributes.append(
                     Field(name=field_name, type=FieldType.STRING)
                 )
+                existing_weight_names.add(field_name)
 
         # Format edge attributes, excluding discriminator fields
         edge_attrs = self._format_edge_attributes(
@@ -1910,8 +1891,8 @@ class TigerGraphConnection(Connection):
 
         # Get field types for discriminator fields
         field_types = {}
-        if first_edge.weights and first_edge.weights.direct:
-            for field in first_edge.weights.direct:
+        if first_edge.attributes:
+            for field in first_edge.attributes:
                 field_types[field.name] = self._get_tigergraph_type(field.type)
 
         # Build FROM/TO pairs for all edges, separated by |
@@ -2541,14 +2522,13 @@ class TigerGraphConnection(Connection):
         """
         Format edge attributes for GSQL CREATE EDGE statement.
 
-        Edge weights/attributes come from edge.weights.direct (list of Field objects).
-        Each weight field needs to be included in the CREATE EDGE statement with its type.
+        Edge attributes come from edge.attributes (list of Field objects).
+        Each attribute field needs to be included in the CREATE EDGE statement with its type.
         """
         attrs = []
 
-        # Get weight fields from edge.weights.direct
-        if edge.weights and edge.weights.direct:
-            for field in edge.weights.direct:
+        if edge.attributes:
+            for field in edge.attributes:
                 # Field objects have name and type attributes
                 field_name = field.name
                 # Get TigerGraph type - FieldType enum values are already in TigerGraph format

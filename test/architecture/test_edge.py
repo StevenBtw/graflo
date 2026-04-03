@@ -12,6 +12,9 @@ from graflo.architecture.database_features import DatabaseProfile
 from graflo.architecture.schema import EdgeConfigDBAware, VertexConfigDBAware
 from graflo.architecture.graph_types import Weight
 from graflo.architecture.schema.vertex import VertexConfig
+from graflo.architecture.contract.declarations.edge_derivation_registry import (
+    EdgeDerivationRegistry,
+)
 from graflo.onto import DBType
 
 logger = logging.getLogger(__name__)
@@ -22,10 +25,15 @@ def test_weight_config_b(vertex_helper_b):
     assert len(wc.fields) == 2
 
 
-def test_init_edge(edge_with_weights):
-    edge = Edge.from_dict(edge_with_weights)
-    assert edge.weights is not None and len(edge.weights.vertices) == 2
-    assert edge.identities == []
+def test_schema_edge_rejects_weights_key():
+    with pytest.raises(ValidationError):
+        Edge.from_dict(
+            {
+                "source": "analyst",
+                "target": "agency",
+                "weights": {"direct": ["x"]},
+            }
+        )
 
 
 def test_init_edge_with_explicit_identities():
@@ -34,7 +42,7 @@ def test_init_edge_with_explicit_identities():
             "source": "entity",
             "target": "entity",
             "identities": [["source", "target", "relation", "pub_id"]],
-            "weights": {"direct": ["pub_id"]},
+            "attributes": ["pub_id"],
         }
     )
     assert edge.identities == [["source", "target", "relation", "pub_id"]]
@@ -86,7 +94,7 @@ def test_edge_finish_init_is_idempotent(vertex_config_kg):
             "source": "entity",
             "target": "entity",
             "identities": [["source", "target", "relation", "pub_id"]],
-            "weights": {"direct": ["pub_id"]},
+            "attributes": ["pub_id"],
         }
     )
     edge.finish_init(vertex_config)
@@ -110,11 +118,12 @@ def test_edge_finish_init_tigergraph_relation_artifacts_are_not_duplicated(
     )
     e.finish_init(vertex_config)
     ec = EdgeConfig(edges=[e])
-    ec.mark_relation_derived_from_key(e.edge_id)
 
     db_features = DatabaseProfile(db_flavor=DBType.TIGERGRAPH)
     vc_db = VertexConfigDBAware(vertex_config, db_features)
-    ec_db = EdgeConfigDBAware(ec, vc_db, db_features)
+    overlay = EdgeDerivationRegistry()
+    overlay.mark_relation_from_key(e.edge_id)
+    ec_db = EdgeConfigDBAware(ec, vc_db, db_features, ingestion_overlay=overlay)
     first_weights = ec_db.effective_weights(e)
     second_weights = ec_db.effective_weights(e)
     first_direct_names = list(
@@ -144,7 +153,7 @@ def test_tigergraph_effective_weights_adds_default_relation_attr(vertex_config_k
         {
             "source": "entity",
             "target": "entity",
-            "weights": {"direct": ["date"]},
+            "attributes": ["date"],
         }
     )
     edge.finish_init(vertex_config)
@@ -167,7 +176,7 @@ def test_tigergraph_runtime_fixed_relation_has_no_relation_attr(vertex_config_kg
             "source": "entity",
             "target": "entity",
             "relation": "KNOWS",
-            "weights": {"direct": ["date"]},
+            "attributes": ["date"],
         }
     )
     edge.finish_init(vertex_config)
@@ -189,7 +198,7 @@ def test_relationship_merge_property_names_defaults_to_direct_weights(
         {
             "source": "entity",
             "target": "entity",
-            "weights": {"direct": ["date", "relation"]},
+            "attributes": ["date", "relation"],
         }
     )
     edge.finish_init(vertex_config)
@@ -208,7 +217,7 @@ def test_relationship_merge_property_names_prefers_first_identity(
             "source": "entity",
             "target": "entity",
             "identities": [["source", "target", "relation", "pub_id"]],
-            "weights": {"direct": ["pub_id"]},
+            "attributes": ["pub_id"],
         }
     )
     edge.finish_init(vertex_config)

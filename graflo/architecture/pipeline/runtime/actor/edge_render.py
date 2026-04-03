@@ -17,6 +17,7 @@ from graflo.architecture.graph_types import (
     LocationIndex,
     TransformPayload,
     VertexRep,
+    Weight,
 )
 from graflo.architecture.util import project_dict
 from graflo.architecture.schema.vertex import VertexConfig
@@ -317,8 +318,8 @@ def render_edge(
                     v_doc = v_rep.vertex
 
                     weight: dict[str, Any] = {}
-                    if edge.weights is not None:
-                        for field in edge.weights.direct:
+                    if edge.attributes:
+                        for field in edge.attributes:
                             field_name = field.name
                             # Direct weights may live on observation ctx (row leftovers) or on
                             # merged vertex docs (passthrough fields merged in VertexActor).
@@ -377,9 +378,11 @@ def render_weights(
     vertex_config: VertexConfig,
     acc_vertex: defaultdict[str, defaultdict[LocationIndex, list]],
     edges: defaultdict[str | None, list],
+    *,
+    vertex_weights: list[Weight] | None = None,
 ) -> defaultdict[str | None, list]:
     """Process and apply weights to edge documents."""
-    vertex_weights = [] if edge.weights is None else edge.weights.vertices
+    vertex_weights = vertex_weights or []
     weights: list = []
 
     for w in vertex_weights:

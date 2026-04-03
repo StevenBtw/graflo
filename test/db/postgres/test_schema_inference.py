@@ -106,12 +106,10 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
 
     # Verify edge has weight configuration if applicable
     # (purchases might have quantity or price as weight)
-    if purchases_edge.weights:
-        # WeightConfig has 'direct' list for direct weights
-        assert (
-            len(purchases_edge.weights.direct) > 0
-            or len(purchases_edge.weights.vertices) > 0
-        ), "purchases edge should have weights"
+    if purchases_edge.attributes:
+        assert len(purchases_edge.attributes) > 0, (
+            "purchases edge should have attribute fields"
+        )
 
     # Verify resources were created
     assert len(ingestion_model.resources) > 0, "IngestionModel should have resources"
@@ -157,9 +155,9 @@ def test_infer_schema_from_postgres(conn_conf, load_mock_schema):
     print(f"\nEdges ({len(schema.core_schema.edge_config._edges_map)}):")
     for edge_id, e in schema.core_schema.edge_config._edges_map.items():
         weights_info = ""
-        if e.weights:
-            weight_count = len(e.weights.direct) + len(e.weights.vertices)
-            weights_info = f" (weights: {weight_count})"
+        if e.attributes:
+            weight_count = len(e.attributes)
+            weights_info = f" (attributes: {weight_count})"
         relation_info = f" [{e.relation}]" if e.relation else ""
         print(f"  - {edge_id}: {e.source} -> {e.target}{relation_info}{weights_info}")
 
@@ -365,9 +363,9 @@ def test_infer_schema_with_pg_catalog_fallback(conn_conf, load_mock_schema):
         print(f"\nEdges ({len(schema.core_schema.edge_config._edges_map)}):")
         for edge_id, e in schema.core_schema.edge_config._edges_map.items():
             weights_info = ""
-            if e.weights:
-                weight_count = len(e.weights.direct) + len(e.weights.vertices)
-                weights_info = f" (weights: {weight_count})"
+            if e.attributes:
+                weight_count = len(e.attributes)
+                weights_info = f" (attributes: {weight_count})"
             relation_info = f" [{e.relation}]" if e.relation else ""
             print(
                 f"  - {edge_id}: {e.source} -> {e.target}{relation_info}{weights_info}"

@@ -50,10 +50,9 @@ ingestion_model:
                     edge:
                         source: author
                         target: institution
-                    weights:
-                        direct:
-                        -   updated_date
-                        -   created_date
+                    attributes:
+                    -   updated_date
+                    -   created_date
     -   name: works
         root:
             children:

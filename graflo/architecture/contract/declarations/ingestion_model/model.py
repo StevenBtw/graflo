@@ -10,6 +10,7 @@ from pydantic import Field as PydanticField, PrivateAttr, model_validator
 from graflo.architecture.base import ConfigBaseModel
 from graflo.onto import DBType
 
+from ..edge_derivation_registry import EdgeDerivationRegistry
 from ..resource import Resource
 from ..transform import ProtoTransform
 
@@ -31,6 +32,9 @@ class IngestionModel(ConfigBaseModel):
 
     _resources: dict[str, Resource] = PrivateAttr()
     _transforms: dict[str, ProtoTransform] = PrivateAttr(default_factory=dict)
+    _combined_edge_derivation: EdgeDerivationRegistry = PrivateAttr(
+        default_factory=EdgeDerivationRegistry
+    )
 
     @model_validator(mode="after")
     def _init_model(self) -> IngestionModel:

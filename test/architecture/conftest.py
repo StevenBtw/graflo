@@ -93,27 +93,6 @@ def vertex_helper_b():
 
 
 @pytest.fixture()
-def edge_with_weights():
-    tc = yaml.safe_load(
-        """
-        source: analyst
-        target: agency
-        weights:
-            vertices:
-                -   
-                    name: ticker
-                    fields:
-                        - cusip
-                -
-                    fields:
-                        - datetime_review
-                        - datetime_announce
-    """
-    )
-    return tc
-
-
-@pytest.fixture()
 def vertex_config_kg():
     vc = yaml.safe_load(
         """
@@ -455,10 +434,9 @@ def resource_openalex_authors():
                     -   _key
     -   source: author
         target: institution
-        weights:
-            direct:
-            -   updated_date
-            -   created_date
+        attributes:
+        -   updated_date
+        -   created_date
     """)
     return an
 
@@ -508,9 +486,8 @@ def resource_kg_menton_triple():
         target: mention
         match_source: triple_index
         match_target: triple
-        weights:
-            direct:
-            -   _role
+        attributes:
+        -   _role
     """)
     return an
 
@@ -649,13 +626,8 @@ def ec_ticker():
     edges:
     -   source: ticker
         target: feature
-        weights:
-            direct:
-            -   t_obs
-            vertices:
-            -   name: feature
-                fields:
-                -   name
+        attributes:
+        -   t_obs
     """
     )
     return EdgeConfig.from_dict(tc)

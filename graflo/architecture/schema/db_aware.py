@@ -7,10 +7,12 @@ These wrappers materialize database-specific naming/defaults from logical
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Iterator, Protocol, runtime_checkable, Any
+
+from pydantic import Field as PydanticField, field_validator
 
 from graflo.architecture.database_features import DatabaseProfile
-from graflo.architecture.graph_types import EdgeId, Index
+from graflo.architecture.graph_types import EdgeId, Index, Weight
 from graflo.onto import DBType
 
 from .edge import (
@@ -18,9 +20,17 @@ from .edge import (
     DEFAULT_TIGERGRAPH_RELATION_WEIGHTNAME,
     Edge,
     EdgeConfig,
-    WeightConfig,
+    _normalize_direct_item,
 )
 from .vertex import Field, FieldType, VertexConfig
+from ..base import ConfigBaseModel
+
+
+@runtime_checkable
+class EdgeIngestionOverlay(Protocol):
+    """Ingestion-only signals that affect DB projection (e.g. TigerGraph DDL)."""
+
+    def uses_relation_from_key(self, edge_id: EdgeId) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -111,6 +121,61 @@ class VertexConfigDBAware:
         return [f.name for f in self.fields(vertex_name)]
 
 
+class WeightConfig(ConfigBaseModel):
+    """Configuration for edge weights and relationships.
+
+    This class manages the configuration of weights and relationships for edges,
+    including source and target field mappings.
+
+    Attributes:
+        vertices: List of weight configurations
+        direct: List of direct field mappings. Can be specified as strings, Field objects, or dicts.
+               Will be normalized to Field objects by the validator.
+               After initialization, this is always list[Field] (type checker sees this).
+
+    Examples:
+        >>> # List of strings
+        >>> wc1 = WeightConfig(direct=["date", "weight"])
+
+        >>> # Typed fields: list of Field objects
+        >>> wc2 = WeightConfig(direct=[
+        ...     Field(name="date", type="DATETIME"),
+        ...     Field(name="weight", type="FLOAT")
+        ... ])
+
+        >>> # From dicts (e.g., from YAML/JSON)
+        >>> wc3 = WeightConfig(direct=[
+        ...     {"name": "date", "type": "DATETIME"},
+        ...     {"name": "weight"}  # defaults to None type
+        ... ])
+    """
+
+    vertices: list[Weight] = PydanticField(
+        default_factory=list,
+        description="List of weight definitions for vertex-based edge attributes.",
+    )
+    direct: list[Field] = PydanticField(
+        default_factory=list,
+        description="Direct edge attributes (field names, Field objects, or dicts). Normalized to Field objects.",
+    )
+
+    @field_validator("direct", mode="before")
+    @classmethod
+    def normalize_direct(cls, v: Any) -> Any:
+        if not isinstance(v, list):
+            return v
+        return [_normalize_direct_item(item) for item in v]
+
+    @property
+    def direct_names(self) -> list[str]:
+        """Get list of direct field names (as strings).
+
+        Returns:
+            list[str]: List of field names
+        """
+        return [field.name for field in self.direct]
+
+
 class EdgeConfigDBAware:
     """DB-aware projection wrapper for `EdgeConfig`."""
 
@@ -119,10 +184,17 @@ class EdgeConfigDBAware:
         logical: EdgeConfig,
         vertex_config: VertexConfigDBAware,
         database_features: DatabaseProfile,
+        ingestion_overlay: EdgeIngestionOverlay | None = None,
     ):
         self.logical = logical
         self.vertex_config = vertex_config
         self.db_profile = database_features
+        self.ingestion_overlay = ingestion_overlay
+
+    def _uses_relation_from_key(self, edge_id: EdgeId) -> bool:
+        if self.ingestion_overlay is not None:
+            return self.ingestion_overlay.uses_relation_from_key(edge_id)
+        return False
 
     @property
     def edges(self) -> list[Edge]:
@@ -151,21 +223,24 @@ class EdgeConfigDBAware:
         )
 
     def effective_weights(self, edge: Edge) -> WeightConfig | None:
+        def _as_weight_config() -> WeightConfig | None:
+            if not edge.attributes:
+                return None
+            return WeightConfig(
+                direct=[f.model_copy(deep=True) for f in edge.attributes],
+            )
+
         if self.db_profile.db_flavor != DBType.TIGERGRAPH:
-            return edge.weights
+            return _as_weight_config()
 
         # Typed TigerGraph edge: per-row relation label stored under a stable attribute.
-        needs_relation_attr = (
-            edge.relation is None or self.logical.uses_relation_from_key(edge.edge_id)
+        needs_relation_attr = edge.relation is None or self._uses_relation_from_key(
+            edge.edge_id
         )
         if not needs_relation_attr:
-            return edge.weights
+            return _as_weight_config()
 
-        base = (
-            edge.weights.model_copy(deep=True)
-            if edge.weights is not None
-            else WeightConfig()
-        )
+        base = _as_weight_config() or WeightConfig()
         if DEFAULT_TIGERGRAPH_RELATION_WEIGHTNAME not in base.direct_names:
             base.direct.append(
                 Field(
@@ -176,7 +251,7 @@ class EdgeConfigDBAware:
 
     def runtime(self, edge: Edge) -> EdgeRuntime:
         needs_tg_relation_attr = self.db_profile.db_flavor == DBType.TIGERGRAPH and (
-            edge.relation is None or self.logical.uses_relation_from_key(edge.edge_id)
+            edge.relation is None or self._uses_relation_from_key(edge.edge_id)
         )
         runtime = EdgeRuntime(
             edge=edge,
@@ -198,7 +273,7 @@ class EdgeConfigDBAware:
 
         Uses the first logical ``identities`` key when present (endpoints omitted —
         they are already matched on nodes). If that key yields no relationship
-        fields, or ``identities`` is empty, falls back to all direct weight names.
+        fields, or ``identities`` is empty, falls back to all declared attribute names.
         """
         db_flavor = self.db_profile.db_flavor
         if edge.identities:
@@ -207,8 +282,8 @@ class EdgeConfigDBAware:
             )
             if props:
                 return props
-        if edge.weights is not None and edge.weights.direct_names:
-            return list(edge.weights.direct_names)
+        if edge.attribute_names:
+            return list(edge.attribute_names)
         return []
 
     @staticmethod

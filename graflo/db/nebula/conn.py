@@ -281,8 +281,8 @@ class NebulaConnection(Connection):
             if rel in created:
                 continue
             edge_fields = []
-            if edge.weights and edge.weights.direct:
-                edge_fields = list(edge.weights.direct)
+            if edge.attributes:
+                edge_fields = list(edge.attributes)
             stmt = create_edge_type_ngql(rel, edge_fields)
             self._execute(stmt)
             created.add(rel)

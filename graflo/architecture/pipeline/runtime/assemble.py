@@ -5,6 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from .actor.edge_render import render_edge, render_weights
+from graflo.architecture.contract.declarations.edge_derivation_registry import (
+    EdgeDerivationRegistry,
+)
 from graflo.architecture.schema.edge import (
     DEFAULT_TIGERGRAPH_RELATION_WEIGHTNAME,
     Edge,
@@ -51,6 +54,7 @@ def _emit_edge_documents(
     lindex: LocationIndex | None,
     relation_input_field: str | None = None,
     derivation: EdgeDerivation | None = None,
+    edge_derivation: EdgeDerivationRegistry | None = None,
 ) -> bool:
     _merge_vertices_for_edge(ctx, vertex_config, edge.source, edge.target)
     edges = render_edge(
@@ -61,7 +65,12 @@ def _emit_edge_documents(
         relation_input_field=relation_input_field,
         derivation=derivation,
     )
-    edges = render_weights(edge, vertex_config, ctx.acc_vertex, edges)
+    vertex_rules: list = []
+    if edge_derivation is not None:
+        vertex_rules = edge_derivation.vertex_weights_for(edge.edge_id)
+    edges = render_weights(
+        edge, vertex_config, ctx.acc_vertex, edges, vertex_weights=vertex_rules
+    )
     emitted = False
     for relation, edocs in edges.items():
         if edocs:
@@ -102,6 +111,7 @@ def assemble_edges(
     infer_edge_only: set[EdgeId] | None = None,
     infer_edge_except: set[EdgeId] | None = None,
     target_db_flavor: DBType | None = None,
+    edge_derivation: EdgeDerivationRegistry | None = None,
 ) -> None:
     """Assemble all edge documents after extraction finishes."""
     if infer_edge_only is None:
@@ -126,6 +136,7 @@ def assemble_edges(
                 lindex=intent.location,
                 relation_input_field=relation_input,
                 derivation=intent.derivation,
+                edge_derivation=edge_derivation,
             ):
                 emitted_pairs.add((edge.source, edge.target))
     else:
@@ -144,6 +155,7 @@ def assemble_edges(
                 lindex=lindex,
                 relation_input_field=relation_input,
                 derivation=None,
+                edge_derivation=edge_derivation,
             ):
                 emitted_pairs.add((edge.source, edge.target))
     ctx.edge_requests = []
@@ -175,5 +187,6 @@ def assemble_edges(
             lindex=None,
             relation_input_field=relation_input,
             derivation=None,
+            edge_derivation=edge_derivation,
         ):
             emitted_pairs.add((s, t))

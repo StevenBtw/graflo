@@ -13,9 +13,8 @@ schema:
             edges:
             -   source: company
                 target: company
-                weights:
-                    direct:
-                    -   date
+                attributes:
+                -   date
     db_profile: {}
 ingestion_model:
     resources:

@@ -4,21 +4,19 @@ core_schema:
         -   relation: follows
             source: users
             target: users
-            weights:
-                direct:
-                -   name: created_at
-                    type: DATETIME
+            attributes:
+            -   name: created_at
+                type: DATETIME
         -   relation: purchases
             source: users
             target: products
-            weights:
-                direct:
-                -   name: purchase_date
-                    type: DATETIME
-                -   name: quantity
-                    type: INT
-                -   name: total_amount
-                    type: FLOAT
+            attributes:
+            -   name: purchase_date
+                type: DATETIME
+            -   name: quantity
+                type: INT
+            -   name: total_amount
+                type: FLOAT
     vertex_config:
         vertices:
         -   fields:

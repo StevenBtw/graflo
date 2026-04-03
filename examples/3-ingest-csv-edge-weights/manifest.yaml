@@ -15,9 +15,8 @@ schema:
                 target: company
                 identities:
                 -   -   relation
-                weights:
-                    direct:
-                    -   date
+                attributes:
+                -   date
     db_profile: {}
 ingestion_model:
     resources:

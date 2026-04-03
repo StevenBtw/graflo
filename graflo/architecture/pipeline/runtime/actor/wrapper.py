@@ -151,6 +151,7 @@ class ActorWrapper:
             infer_edge_only=self.infer_edge_only,
             infer_edge_except=self.infer_edge_except,
             target_db_flavor=self.target_db_flavor,
+            edge_derivation=self.init_ctx.edge_derivation,
         )
 
         for vertex_name, dd in assembly_ctx.acc_vertex.items():

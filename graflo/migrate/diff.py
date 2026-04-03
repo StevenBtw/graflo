@@ -245,8 +245,8 @@ class SchemaDiff:
                     )
                 )
 
-            old_direct = _field_map(old_edge.weights.direct if old_edge.weights else [])
-            new_direct = _field_map(new_edge.weights.direct if new_edge.weights else [])
+            old_direct = _field_map(old_edge.attributes)
+            new_direct = _field_map(new_edge.attributes)
             old_names = set(old_direct)
             new_names = set(new_direct)
 

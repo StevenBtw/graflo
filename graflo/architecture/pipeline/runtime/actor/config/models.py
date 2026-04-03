@@ -345,8 +345,13 @@ class EdgeActorConfig(ConfigBaseModel):
         default=None,
         description="Ingestion: require this segment on both source and target locations.",
     )
-    weights: dict[str, list[str]] | None = PydanticField(
-        default=None, description="Weight configuration"
+    attributes: list[Any] = PydanticField(
+        default_factory=list,
+        description="Edge attributes merged into schema Edge (same forms as Edge.attributes).",
+    )
+    vertex_weights: list[Any] = PydanticField(
+        default_factory=list,
+        description="Vertex-derived weight rules registered in EdgeDerivationRegistry.",
     )
 
     @property

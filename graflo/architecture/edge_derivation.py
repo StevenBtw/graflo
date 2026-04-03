@@ -5,9 +5,10 @@ They are set on edge pipeline steps (:class:`~graflo.architecture.pipeline.runti
 threaded through :class:`~graflo.architecture.graph_types.EdgeIntent`, and used in
 :func:`~graflo.architecture.pipeline.runtime.actor.edge_render.render_edge`.
 
-When :attr:`EdgeDerivation.relation_from_key` is true, :class:`~graflo.architecture.schema.edge.EdgeConfig`
-records the edge id via :meth:`~graflo.architecture.schema.edge.EdgeConfig.mark_relation_derived_from_key`
-so :class:`~graflo.architecture.schema.db_aware.EdgeConfigDBAware` can align TigerGraph DDL with runtime.
+When :attr:`EdgeDerivation.relation_from_key` is true, the ingestion
+:class:`~graflo.architecture.contract.declarations.edge_derivation_registry.EdgeDerivationRegistry`
+records the edge id so :class:`~graflo.architecture.schema.db_aware.EdgeConfigDBAware` (with overlay)
+can align TigerGraph DDL with runtime.
 """
 
 from __future__ import annotations

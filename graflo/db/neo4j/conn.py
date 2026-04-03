@@ -364,9 +364,6 @@ class Neo4jConnection(Connection):
             return
 
         if delete_all:
-            logger.warning(
-                "delete_graph_structure(delete_all=True) will remove all nodes and relationships in the selected Neo4j database"
-            )
             self._drop_all_user_indexes_and_constraints()
             self.execute("MATCH (n) DETACH DELETE n")
             return

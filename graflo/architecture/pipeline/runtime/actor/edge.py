@@ -8,7 +8,7 @@ from .base import Actor, ActorInitContext
 from .config import EdgeActorConfig
 from graflo.architecture.edge_derivation import EdgeDerivation
 from graflo.architecture.schema.edge import Edge
-from graflo.architecture.graph_types import ExtractionContext, LocationIndex
+from graflo.architecture.graph_types import ExtractionContext, LocationIndex, Weight
 
 
 class EdgeActor(Actor):
@@ -16,6 +16,7 @@ class EdgeActor(Actor):
 
     def __init__(self, config: EdgeActorConfig):
         self.derivation: EdgeDerivation = config.derivation
+        self._pending_vertex_weights: list[Weight] = []
         payload: dict[str, Any] = {
             "source": config.source,
             "target": config.target,
@@ -24,15 +25,17 @@ class EdgeActor(Actor):
             payload["relation"] = config.relation
         if config.description is not None:
             payload["description"] = config.description
-        if config.weights is not None:
-            payload["weights"] = config.weights
+        if config.attributes:
+            payload["attributes"] = config.attributes
+        for item in config.vertex_weights:
+            self._pending_vertex_weights.append(Weight.model_validate(item))
         self.edge = Edge.from_dict(payload)
         self.vertex_config: Any = None
         self.allowed_vertex_names: set[str] | None = None
 
     @property
     def relation_field(self) -> str | None:
-        """Backward-compatible alias for tooling (e.g. plot labels)."""
+        """Alias for tooling (e.g. plot labels)."""
         return self.derivation.relation_field
 
     @classmethod
@@ -60,7 +63,11 @@ class EdgeActor(Actor):
                 self.edge, vertex_config=self.vertex_config
             )
             if self.derivation.relation_from_key:
-                init_ctx.edge_config.mark_relation_derived_from_key(edge_id)
+                init_ctx.edge_derivation.mark_relation_from_key(edge_id)
+            if self._pending_vertex_weights:
+                init_ctx.edge_derivation.merge_vertex_weights(
+                    edge_id, self._pending_vertex_weights
+                )
             self.edge = init_ctx.edge_config.edge_for(edge_id)
 
     def __call__(

@@ -43,13 +43,8 @@ schema:
             edges:
             -   source: ticker
                 target: feature
-                weights:
-                    direct:
-                    -   t_obs
-                    vertices:
-                    -   name: feature
-                        fields:
-                        -   name
+                attributes:
+                -   t_obs
     db_profile:
         vertex_storage_names:
             ticker: tickers
@@ -120,4 +115,14 @@ ingestion_model:
         -   transform:
                 rename:
                     __ticker: oftic
+        -   vertex: ticker
+        -   vertex: feature
+        -   source: ticker
+            target: feature
+            attributes:
+            -   t_obs
+            vertex_weights:
+            -   name: feature
+                fields:
+                -   name
 bindings: {}
