@@ -51,6 +51,10 @@ schema:
                 -   t_window
             -   source: mention
                 target: entity
+            -   source: mention
+                target: mention
+                identities:
+                -   -   _role
             -   source: entity
                 target: community
             -   source: community
@@ -123,14 +127,6 @@ schema:
             -   fields:
                 -   publication@_id
                 unique: false
-        -   source: mention
-            target: mention
-            purpose:
-            indexes:
-            -   fields:
-                -   _from
-                -   _to
-                -   _role
 ingestion_model:
     resources:
     -   name: kg

@@ -254,11 +254,15 @@ class DBWriter:
                                             merge_props
                                         )
                                 elif conn_conf.connection_type == DBType.ARANGO:
-                                    if merge_props is not None:
-                                        edge_kw["upsert_option"] = True
-                                        edge_kw["uniq_weight_fields"] = list(
-                                            merge_props
-                                        )
+                                    if (
+                                        self.ingestion_model.edges_on_duplicate
+                                        == "upsert"
+                                    ):
+                                        edge_kw["on_duplicate"] = "upsert"
+                                        if merge_props is not None:
+                                            edge_kw["uniq_weight_fields"] = list(
+                                                merge_props
+                                            )
                                 db.insert_edges_batch(
                                     docs_edges=data,
                                     source_class=vc.vertex_dbname(edge.source),

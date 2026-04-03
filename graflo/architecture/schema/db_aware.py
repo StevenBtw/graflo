@@ -318,9 +318,14 @@ class EdgeConfigDBAware:
                 )
                 if not identity_fields:
                     continue
+                fields, unique = self._normalize_edge_identity_index(
+                    identity_fields, db_flavor
+                )
+                if not fields:
+                    continue
                 self.db_profile.add_edge_index(
                     edge.edge_id,
-                    Index(fields=identity_fields, unique=True),
+                    Index(fields=fields, unique=unique),
                     purpose=None,
                 )
 
@@ -345,6 +350,37 @@ class EdgeConfigDBAware:
             if field not in deduped:
                 deduped.append(field)
         return deduped
+
+    @staticmethod
+    def _normalize_edge_identity_index(
+        fields: list[str], db_flavor: DBType
+    ) -> tuple[list[str], bool]:
+        """Map logical edge identity to physical index fields and DB uniqueness.
+
+        Logical uniqueness is always ``(source, *relationship_fields, target)``.
+
+        * **ArangoDB** — Edge documents carry ``_from`` / ``_to``. Unique persistent
+          indexes must include them before other fields, even when the YAML
+          ``identities`` entry lists only relationship tokens (e.g. ``_role``).
+        * **Neo4j, FalkorDB, Memgraph, Nebula** — Indexed columns are relationship /
+          edge-type properties only; they cannot express endpoint scope. We still
+          register the property fields for lookups but set ``unique=False`` so the
+          database is not asked to enforce a misleading global uniqueness on those
+          properties alone. (Application MERGE / ingest semantics remain authoritative.)
+        * **TigerGraph** — Edge secondary indexes are not applied by the driver today;
+          fields are kept for profiling; uniqueness is preserved for consistency.
+        """
+        rest = [f for f in fields if f not in ("_from", "_to")]
+        if db_flavor == DBType.ARANGO:
+            return (["_from", "_to", *rest], True)
+        if db_flavor in (
+            DBType.NEO4J,
+            DBType.FALKORDB,
+            DBType.MEMGRAPH,
+            DBType.NEBULA,
+        ):
+            return (fields, False)
+        return (fields, True)
 
 
 @dataclass(frozen=True)

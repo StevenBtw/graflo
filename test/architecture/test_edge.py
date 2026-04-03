@@ -97,6 +97,52 @@ def test_compile_identity_indexes_registers_each_identity_key(vertex_config_kg):
     assert all(ix.unique for ix in indexes)
 
 
+def test_compile_identity_indexes_arango_prepends_from_to_when_identity_omits_endpoints(
+    vertex_config_kg,
+):
+    """Relationship-only identity tokens still get _from/_to on Arango unique indexes."""
+    vertex_config = VertexConfig.from_dict(vertex_config_kg)
+    edge = Edge.from_dict(
+        {
+            "source": "mention",
+            "target": "mention",
+            "identities": [["_role"]],
+        }
+    )
+    edge.finish_init(vertex_config)
+    profile = DatabaseProfile(db_flavor=DBType.ARANGO)
+    vc_db = VertexConfigDBAware(vertex_config, profile)
+    ec_db = EdgeConfigDBAware(EdgeConfig(edges=[edge]), vc_db, profile)
+    ec_db.compile_identity_indexes()
+    indexes = profile.edge_secondary_indexes(edge.edge_id)
+    assert len(indexes) == 1
+    assert tuple(indexes[0].fields) == ("_from", "_to", "_role")
+    assert indexes[0].unique is True
+
+
+def test_compile_identity_indexes_neo4j_property_indexes_not_globally_unique(
+    vertex_config_kg,
+):
+    """LPG backends cannot encode endpoints in rel property constraints; no bogus UNIQUE."""
+    vertex_config = VertexConfig.from_dict(vertex_config_kg)
+    edge = Edge.from_dict(
+        {
+            "source": "mention",
+            "target": "mention",
+            "identities": [["_role"]],
+        }
+    )
+    edge.finish_init(vertex_config)
+    profile = DatabaseProfile(db_flavor=DBType.NEO4J)
+    vc_db = VertexConfigDBAware(vertex_config, profile)
+    ec_db = EdgeConfigDBAware(EdgeConfig(edges=[edge]), vc_db, profile)
+    ec_db.compile_identity_indexes()
+    indexes = profile.edge_secondary_indexes(edge.edge_id)
+    assert len(indexes) == 1
+    assert tuple(indexes[0].fields) == ("_role",)
+    assert indexes[0].unique is False
+
+
 def test_relationship_merge_property_names_uses_first_identity_only(vertex_config_kg):
     vertex_config = VertexConfig.from_dict(vertex_config_kg)
     edge = Edge.from_dict(
