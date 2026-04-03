@@ -29,14 +29,14 @@ MINI_SCHEMA_DICT = {
             "vertices": [
                 {
                     "name": "Person",
-                    "fields": [
+                    "properties": [
                         {"name": "name", "type": "STRING"},
                         {"name": "age", "type": "INT"},
                     ],
                 },
                 {
                     "name": "City",
-                    "fields": [
+                    "properties": [
                         {"name": "name", "type": "STRING"},
                         {"name": "population", "type": "INT"},
                     ],

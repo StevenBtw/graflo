@@ -6,16 +6,14 @@ schema:
         vertex_config:
             vertices:
             -   name: publication
-                fields:
-                -   arxiv
-                -   doi
+                properties:
                 -   created
                 -   data_source
                 identity:
                 -   arxiv
                 -   doi
             -   name: entity
-                fields:
+                properties:
                 -   linker_type
                 -   ent_db_type
                 -   id
@@ -25,12 +23,12 @@ schema:
                 identity:
                 -   _key
             -   name: mention
-                fields:
+                properties:
                 -   text
                 identity:
                 -   _key
             -   name: community
-                fields:
+                properties:
                 -   obs_date
                 -   t_window
                 -   comm_id
@@ -47,7 +45,7 @@ schema:
                 -   -   source
                     -   target
                     -   publication@_id
-                attributes:
+                properties:
                 -   publication@_id
                 -   obs_date
                 -   t_window
@@ -189,7 +187,7 @@ ingestion_model:
             match_source: triple_index
             target: mention
             match_target: triple
-            attributes:
+            properties:
             -   _role
     -   name: communities
         apply:

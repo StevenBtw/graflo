@@ -35,7 +35,7 @@ def add_blank_collections(
     for vname in vertex_conf.blank_vertices:
         v = vertex_conf[vname]
         for item in buffer_transforms:
-            prep_doc = {f: item[f] for f in v.field_names if f in item}
+            prep_doc = {f: item[f] for f in v.property_names if f in item}
             if vname not in ctx.acc_global:
                 ctx.acc_global[vname] = [prep_doc]
     return ctx
@@ -318,8 +318,8 @@ def render_edge(
                     v_doc = v_rep.vertex
 
                     weight: dict[str, Any] = {}
-                    if edge.attributes:
-                        for field in edge.attributes:
+                    if edge.properties:
+                        for field in edge.properties:
                             field_name = field.name
                             # Direct weights may live on observation ctx (row leftovers) or on
                             # merged vertex docs (passthrough fields merged in VertexActor).

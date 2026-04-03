@@ -25,8 +25,8 @@ class EdgeActor(Actor):
             payload["relation"] = config.relation
         if config.description is not None:
             payload["description"] = config.description
-        if config.attributes:
-            payload["attributes"] = config.attributes
+        if config.properties:
+            payload["properties"] = config.properties
         for item in config.vertex_weights:
             self._pending_vertex_weights.append(Weight.model_validate(item))
         self.edge = Edge.from_dict(payload)

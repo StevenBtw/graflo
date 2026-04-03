@@ -628,7 +628,7 @@ class ManifestPlotter:
         kwargs = {"vfield": True, "vertex_sh": vertex_prefix_dict}
         for k in vconf.vertex_set:
             index_fields = vconf.identity_fields(k)
-            fields = vconf.fields_names(k)
+            fields = vconf.property_names(k)
             kwargs["vertex"] = k
             nodes_collection = [
                 (

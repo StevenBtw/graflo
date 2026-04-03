@@ -1638,7 +1638,7 @@ class TigerGraphConnection(Connection):
 
         # Get field type for primary key field(s) - convert FieldType enum to string
         field_type_map = {}
-        for f in vertex.fields:
+        for f in vertex.properties:
             if f.type:
                 field_type_map[f.name] = (
                     f.type.value if hasattr(f.type, "value") else str(f.type)
@@ -1648,7 +1648,7 @@ class TigerGraphConnection(Connection):
 
         # Format all fields
         all_fields = []
-        for field in vertex.fields:
+        for field in vertex.properties:
             if field.type:
                 field_type = (
                     field.type.value
@@ -1702,9 +1702,9 @@ class TigerGraphConnection(Connection):
         ew = ec_db.effective_weights(edge)
         edge_copy = edge.model_copy(deep=True)
         if ew is not None:
-            edge_copy.attributes = [f.model_copy(deep=True) for f in ew.direct]
+            edge_copy.properties = [f.model_copy(deep=True) for f in ew.direct]
         else:
-            edge_copy.attributes = []
+            edge_copy.properties = []
         return edge_copy
 
     def _format_edge_attributes(
@@ -1719,14 +1719,14 @@ class TigerGraphConnection(Connection):
         Returns:
             str: Formatted attribute string (e.g., "    date STRING,\n    relation STRING")
         """
-        if not edge.attributes:
+        if not edge.properties:
             return ""
 
         if exclude_fields is None:
             exclude_fields = set()
 
         attr_parts = []
-        for field in edge.attributes:
+        for field in edge.properties:
             field_name = field.name
             if field_name not in exclude_fields:
                 field_type = self._get_tigergraph_type(field.type)
@@ -1769,14 +1769,14 @@ class TigerGraphConnection(Connection):
 
         # IMPORTANT: In TigerGraph, discriminator fields MUST also be edge attributes.
         # If an indexed field is not in attributes, we need to add it.
-        existing_weight_names = {f.name for f in edge.attributes}
+        existing_weight_names = {f.name for f in edge.properties}
 
         # Add any indexed fields that are missing from attributes
         for field_name in indexed_field_names:
             if field_name not in existing_weight_names:
                 from graflo.architecture.schema.edge import Field
 
-                edge.attributes.append(Field(name=field_name, type=FieldType.STRING))
+                edge.properties.append(Field(name=field_name, type=FieldType.STRING))
                 existing_weight_names.add(field_name)
                 logger.info(
                     f"Added indexed field '{field_name}' to edge attributes for discriminator compatibility"
@@ -1793,8 +1793,8 @@ class TigerGraphConnection(Connection):
 
         # Get field types for discriminator fields
         field_types = {}
-        if edge.attributes:
-            for field in edge.attributes:
+        if edge.properties:
+            for field in edge.properties:
                 field_types[field.name] = self._get_tigergraph_type(field.type)
 
         # Use sanitized dbname for schema names when available
@@ -1873,13 +1873,13 @@ class TigerGraphConnection(Connection):
         indexed_field_names = self._edge_identity_discriminator_fields(first_edge)
 
         # Ensure indexed fields are in attributes (same logic as _get_edge_add_statement)
-        existing_weight_names = {f.name for f in first_edge.attributes}
+        existing_weight_names = {f.name for f in first_edge.properties}
 
         for field_name in indexed_field_names:
             if field_name not in existing_weight_names:
                 from graflo.architecture.schema.edge import Field
 
-                first_edge.attributes.append(
+                first_edge.properties.append(
                     Field(name=field_name, type=FieldType.STRING)
                 )
                 existing_weight_names.add(field_name)
@@ -1891,8 +1891,8 @@ class TigerGraphConnection(Connection):
 
         # Get field types for discriminator fields
         field_types = {}
-        if first_edge.attributes:
-            for field in first_edge.attributes:
+        if first_edge.properties:
+            for field in first_edge.properties:
                 field_types[field.name] = self._get_tigergraph_type(field.type)
 
         # Build FROM/TO pairs for all edges, separated by |
@@ -2502,7 +2502,7 @@ class TigerGraphConnection(Connection):
         Returns:
             str: Formatted field definitions for GSQL CREATE VERTEX statement
         """
-        fields = vertex.fields
+        fields = vertex.properties
 
         if not fields:
             # Default fields if none specified
@@ -2522,13 +2522,13 @@ class TigerGraphConnection(Connection):
         """
         Format edge attributes for GSQL CREATE EDGE statement.
 
-        Edge attributes come from edge.attributes (list of Field objects).
+        Edge properties come from edge.properties (list of Field objects).
         Each attribute field needs to be included in the CREATE EDGE statement with its type.
         """
         attrs = []
 
-        if edge.attributes:
-            for field in edge.attributes:
+        if edge.properties:
+            for field in edge.properties:
                 # Field objects have name and type attributes
                 field_name = field.name
                 # Get TigerGraph type - FieldType enum values are already in TigerGraph format
@@ -3839,7 +3839,9 @@ class TigerGraphConnection(Connection):
             vertex_config = kwargs.get("vertex_config")
 
             if field_types is None and vertex_config is not None:
-                field_types = {f.name: f.type for f in vertex_config.fields(class_name)}
+                field_types = {
+                    f.name: f.type for f in vertex_config.properties(class_name)
+                }
 
             # Build REST++ filter string with field type information
             filter_str = self._render_rest_filter(filters, field_types=field_types)

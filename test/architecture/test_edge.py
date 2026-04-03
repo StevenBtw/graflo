@@ -42,7 +42,7 @@ def test_init_edge_with_explicit_identities():
             "source": "entity",
             "target": "entity",
             "identities": [["source", "target", "relation", "pub_id"]],
-            "attributes": ["pub_id"],
+            "properties": ["pub_id"],
         }
     )
     assert edge.identities == [["source", "target", "relation", "pub_id"]]
@@ -59,7 +59,8 @@ def test_edge_rejects_legacy_indexes_field():
         )
 
 
-def test_edge_identities_require_declared_direct_fields(vertex_config_kg):
+def test_edge_identities_merge_undeclared_tokens_into_properties(vertex_config_kg):
+    """Identity fields not listed under ``properties`` are added like vertex identity."""
     vertex_config = VertexConfig.from_dict(vertex_config_kg)
     edge = Edge.from_dict(
         {
@@ -68,8 +69,51 @@ def test_edge_identities_require_declared_direct_fields(vertex_config_kg):
             "identities": [["source", "target", "relation", "pub_id"]],
         }
     )
-    with pytest.raises(ValueError, match="unknown identity fields"):
-        edge.finish_init(vertex_config)
+    edge.finish_init(vertex_config)
+    assert "pub_id" in edge.property_names
+    assert "relation" in edge.property_names
+
+
+def test_compile_identity_indexes_registers_each_identity_key(vertex_config_kg):
+    vertex_config = VertexConfig.from_dict(vertex_config_kg)
+    edge = Edge.from_dict(
+        {
+            "source": "entity",
+            "target": "entity",
+            "identities": [
+                ["source", "target", "pub_id"],
+                ["source", "target", "kind"],
+            ],
+        }
+    )
+    edge.finish_init(vertex_config)
+    profile = DatabaseProfile(db_flavor=DBType.ARANGO)
+    vc_db = VertexConfigDBAware(vertex_config, profile)
+    ec_db = EdgeConfigDBAware(EdgeConfig(edges=[edge]), vc_db, profile)
+    ec_db.compile_identity_indexes()
+    indexes = profile.edge_secondary_indexes(edge.edge_id)
+    field_sets = {tuple(ix.fields) for ix in indexes}
+    assert field_sets == {("_from", "_to", "pub_id"), ("_from", "_to", "kind")}
+    assert all(ix.unique for ix in indexes)
+
+
+def test_relationship_merge_property_names_uses_first_identity_only(vertex_config_kg):
+    vertex_config = VertexConfig.from_dict(vertex_config_kg)
+    edge = Edge.from_dict(
+        {
+            "source": "entity",
+            "target": "entity",
+            "identities": [
+                ["source", "target", "relation", "pub_id"],
+                ["source", "target", "kind"],
+            ],
+        }
+    )
+    edge.finish_init(vertex_config)
+    profile = DatabaseProfile(db_flavor=DBType.NEO4J)
+    vc_db = VertexConfigDBAware(vertex_config, profile)
+    ec_db = EdgeConfigDBAware(EdgeConfig(edges=[edge]), vc_db, profile)
+    assert ec_db.relationship_merge_property_names(edge) == ["relation", "pub_id"]
 
 
 def test_edge_config(vertex_config_kg, edge_config_kg):
@@ -94,7 +138,7 @@ def test_edge_finish_init_is_idempotent(vertex_config_kg):
             "source": "entity",
             "target": "entity",
             "identities": [["source", "target", "relation", "pub_id"]],
-            "attributes": ["pub_id"],
+            "properties": ["pub_id"],
         }
     )
     edge.finish_init(vertex_config)
@@ -153,7 +197,7 @@ def test_tigergraph_effective_weights_adds_default_relation_attr(vertex_config_k
         {
             "source": "entity",
             "target": "entity",
-            "attributes": ["date"],
+            "properties": ["date"],
         }
     )
     edge.finish_init(vertex_config)
@@ -176,7 +220,7 @@ def test_tigergraph_runtime_fixed_relation_has_no_relation_attr(vertex_config_kg
             "source": "entity",
             "target": "entity",
             "relation": "KNOWS",
-            "attributes": ["date"],
+            "properties": ["date"],
         }
     )
     edge.finish_init(vertex_config)
@@ -198,7 +242,7 @@ def test_relationship_merge_property_names_defaults_to_direct_weights(
         {
             "source": "entity",
             "target": "entity",
-            "attributes": ["date", "relation"],
+            "properties": ["date", "relation"],
         }
     )
     edge.finish_init(vertex_config)
@@ -217,7 +261,7 @@ def test_relationship_merge_property_names_prefers_first_identity(
             "source": "entity",
             "target": "entity",
             "identities": [["source", "target", "relation", "pub_id"]],
-            "attributes": ["pub_id"],
+            "properties": ["pub_id"],
         }
     )
     edge.finish_init(vertex_config)

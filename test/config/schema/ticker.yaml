@@ -5,7 +5,7 @@ schema:
         vertex_config:
             vertices:
             -   name: ticker
-                fields:
+                properties:
                 -   cusip
                 -   cname
                 -   oftic
@@ -14,7 +14,7 @@ schema:
                 -   cname
                 -   oftic
             -   name: feature
-                fields:
+                properties:
                 -   name
                 -   value
                 identity:
@@ -43,7 +43,7 @@ schema:
             edges:
             -   source: ticker
                 target: feature
-                attributes:
+                properties:
                 -   t_obs
     db_profile:
         vertex_storage_names:
@@ -119,7 +119,7 @@ ingestion_model:
         -   vertex: feature
         -   source: ticker
             target: feature
-            attributes:
+            properties:
             -   t_obs
             vertex_weights:
             -   name: feature

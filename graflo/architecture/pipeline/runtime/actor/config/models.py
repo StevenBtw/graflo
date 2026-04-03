@@ -345,9 +345,9 @@ class EdgeActorConfig(ConfigBaseModel):
         default=None,
         description="Ingestion: require this segment on both source and target locations.",
     )
-    attributes: list[Any] = PydanticField(
+    properties: list[Any] = PydanticField(
         default_factory=list,
-        description="Edge attributes merged into schema Edge (same forms as Edge.attributes).",
+        description="Edge properties merged into schema Edge (same forms as Edge.properties).",
     )
     vertex_weights: list[Any] = PydanticField(
         default_factory=list,

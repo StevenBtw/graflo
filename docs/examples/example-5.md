@@ -89,7 +89,7 @@ The inference engine uses intelligent heuristics to classify tables. **These heu
 
 - **Require**: 2+ foreign key (FK) constraints decorated on the table
 - Foreign keys represent relationships between entities
-- May have additional attributes (weights, timestamps, quantities)
+- May have additional properties (weights, timestamps, quantities)
 - Represent relationships or transactions between entities
 - Foreign keys point to vertex tables and become edge source/target mappings
 

@@ -78,7 +78,7 @@ class PostgresSchemaInferencer:
             # Create vertex
             vertex = Vertex(
                 name=table_name,
-                fields=fields,
+                properties=fields,
                 identity=list(pk_columns),
             )
 
@@ -309,7 +309,7 @@ class PostgresSchemaInferencer:
             edge = Edge(
                 source=source_table,
                 target=target_table,
-                attributes=attrs,
+                properties=attrs,
                 relation=edge_table_info.relation,
             )
 

@@ -4,13 +4,13 @@ core_schema:
         -   relation: follows
             source: users
             target: users
-            attributes:
+            properties:
             -   name: created_at
                 type: DATETIME
         -   relation: purchases
             source: users
             target: products
-            attributes:
+            properties:
             -   name: purchase_date
                 type: DATETIME
             -   name: quantity
@@ -19,7 +19,7 @@ core_schema:
                 type: FLOAT
     vertex_config:
         vertices:
-        -   fields:
+        -   properties:
             -   name: id
                 type: INT
             -   name: name
@@ -33,7 +33,7 @@ core_schema:
             identity:
             -   id
             name: products
-        -   fields:
+        -   properties:
             -   name: id
                 type: INT
             -   name: name

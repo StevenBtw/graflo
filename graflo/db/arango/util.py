@@ -42,7 +42,7 @@ def define_extra_edges(g: Edge):
         >>> # Generates query to create user->post edges through comments
     """
     ucol, vcol, wcol = g.source, g.target, g.by
-    weight = g.attributes
+    weight = g.properties
     s = f"""FOR w IN {wcol}
         LET uset = (FOR u IN 1..1 INBOUND w {ucol}_{wcol}_edges RETURN u)
         LET vset = (FOR v IN 1..1 INBOUND w {vcol}_{wcol}_edges RETURN v)

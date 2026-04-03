@@ -48,7 +48,7 @@ def test_assembly_context_from_extraction_shares_vertex_accumulator():
 
 def test_actor_executor_assemble_result_returns_graph_result():
     vc = VertexConfig.from_dict(
-        {"vertices": [{"name": "author", "fields": ["id"], "identity": ["id"]}]}
+        {"vertices": [{"name": "author", "properties": ["id"], "identity": ["id"]}]}
     )
     ec = EdgeConfig.from_dict({"edges": []})
 

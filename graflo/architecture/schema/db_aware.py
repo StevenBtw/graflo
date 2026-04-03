@@ -107,18 +107,18 @@ class VertexConfigDBAware:
             return ["_key"] if self.db_profile.db_flavor == DBType.ARANGO else ["id"]
         return identity
 
-    def fields(self, vertex_name: str) -> list[Field]:
-        fields = self.logical.fields(vertex_name)
+    def properties(self, vertex_name: str) -> list[Field]:
+        props = self.logical.properties(vertex_name)
         if self.db_profile.db_flavor != DBType.TIGERGRAPH:
-            return fields
+            return props
         # TigerGraph needs explicit scalar defaults for schema definition.
         return [
             Field(name=f.name, type=FieldType.STRING if f.type is None else f.type)
-            for f in fields
+            for f in props
         ]
 
-    def fields_names(self, vertex_name: str) -> list[str]:
-        return [f.name for f in self.fields(vertex_name)]
+    def property_names(self, vertex_name: str) -> list[str]:
+        return [f.name for f in self.properties(vertex_name)]
 
 
 class WeightConfig(ConfigBaseModel):
@@ -224,10 +224,10 @@ class EdgeConfigDBAware:
 
     def effective_weights(self, edge: Edge) -> WeightConfig | None:
         def _as_weight_config() -> WeightConfig | None:
-            if not edge.attributes:
+            if not edge.properties:
                 return None
             return WeightConfig(
-                direct=[f.model_copy(deep=True) for f in edge.attributes],
+                direct=[f.model_copy(deep=True) for f in edge.properties],
             )
 
         if self.db_profile.db_flavor != DBType.TIGERGRAPH:
@@ -269,11 +269,15 @@ class EdgeConfigDBAware:
         return runtime
 
     def relationship_merge_property_names(self, edge: Edge) -> list[str]:
-        """Relationship properties that distinguish parallel edges (Cypher MERGE, etc.).
+        """Relationship properties used for edge upsert/MERGE keys (per backend).
 
-        Uses the first logical ``identities`` key when present (endpoints omitted —
-        they are already matched on nodes). If that key yields no relationship
-        fields, or ``identities`` is empty, falls back to all declared attribute names.
+        Uniqueness is ``(source_id, *identity_fields, target_id)`` for the **first**
+        logical ``identities`` key (endpoints are matched separately on vertices).
+        Additional ``identities`` keys are compiled into separate unique indexes
+        via :meth:`compile_identity_indexes` but do not change the writer merge key.
+
+        If that key yields no relationship fields, or ``identities`` is empty,
+        falls back to all declared edge attribute names.
         """
         db_flavor = self.db_profile.db_flavor
         if edge.identities:
@@ -282,8 +286,8 @@ class EdgeConfigDBAware:
             )
             if props:
                 return props
-        if edge.attribute_names:
-            return list(edge.attribute_names)
+        if edge.property_names:
+            return list(edge.property_names)
         return []
 
     @staticmethod

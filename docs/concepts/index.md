@@ -518,11 +518,11 @@ An `Edge` describes edges and their logical identities. It allows:
 - Weight configuration using `direct` parameter (with optional type information)
 - Optional uniqueness semantics through `identities` (multiple candidate keys are allowed)
 
-### Edge Attributes and Configuration
+### Edge Properties and Configuration
 
-Edges in graflo support a rich set of attributes that enable flexible relationship modeling:
+Edges in graflo support a rich set of properties that enable flexible relationship modeling:
 
-#### Basic Attributes
+#### Basic Properties
 - **`source`**: Source vertex name (required)
 - **`target`**: Target vertex name (required)
 - **`identities`**: Logical identity keys for the edge (each key can induce uniqueness)
@@ -562,7 +562,7 @@ Edges in graflo support a rich set of attributes that enable flexible relationsh
 - DB-specific edge storage/type names are resolved from `database_features`
   through DB-aware wrappers (`EdgeConfigDBAware`), not stored on `Edge`.
 
-#### When to Use Different Attributes
+#### When to Use Different Properties
 
 **`relation_field`** (Example 3):
  

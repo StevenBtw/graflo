@@ -16,7 +16,7 @@ def _minimal_manifest(metadata_name: str = "logical_schema") -> GraphManifest:
                 "core_schema": {
                     "vertex_config": {
                         "vertices": [
-                            {"name": "v", "fields": ["id"], "identity": ["id"]}
+                            {"name": "v", "properties": ["id"], "identity": ["id"]}
                         ]
                     },
                     "edge_config": {"edges": []},

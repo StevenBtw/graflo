@@ -198,7 +198,7 @@ class DBWriter:
                             class_name=vc.vertex_dbname(weight.name),
                             batch=gc.vertices[weight.name],
                             match_keys=index_fields,
-                            keep_keys=weight.fields,
+                            keep_keys=weight.properties,
                         )
                         for j, item in enumerate(gc.linear):
                             weights = weights_per_item[j]
@@ -227,14 +227,9 @@ class DBWriter:
                     with ConnectionManager(connection_config=conn_conf) as db:
                         runtime = ec.runtime(edge)
                         merge_props: tuple[str, ...] | None = None
-                        if conn_conf.connection_type in (
-                            DBType.NEO4J,
-                            DBType.FALKORDB,
-                            DBType.MEMGRAPH,
-                        ):
-                            mp = ec.relationship_merge_property_names(edge)
-                            if mp:
-                                merge_props = tuple(mp)
+                        mp = ec.relationship_merge_property_names(edge)
+                        if mp:
+                            merge_props = tuple(mp)
                         for ee in gc.loop_over_relations(edge_id):
                             _, _, relation = ee
                             if not self.dry:
@@ -249,10 +244,21 @@ class DBWriter:
                                     "dry": self.dry,
                                     "collection_name": runtime.storage_name(),
                                 }
-                                if merge_props is not None:
-                                    edge_kw["relationship_merge_properties"] = (
-                                        merge_props
-                                    )
+                                if conn_conf.connection_type in (
+                                    DBType.NEO4J,
+                                    DBType.FALKORDB,
+                                    DBType.MEMGRAPH,
+                                ):
+                                    if merge_props is not None:
+                                        edge_kw["relationship_merge_properties"] = (
+                                            merge_props
+                                        )
+                                elif conn_conf.connection_type == DBType.ARANGO:
+                                    if merge_props is not None:
+                                        edge_kw["upsert_option"] = True
+                                        edge_kw["uniq_weight_fields"] = list(
+                                            merge_props
+                                        )
                                 db.insert_edges_batch(
                                     docs_edges=data,
                                     source_class=vc.vertex_dbname(edge.source),

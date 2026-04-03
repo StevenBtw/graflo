@@ -63,7 +63,7 @@ def schema_ibes_edges():
         target: ticker
     -   source: analyst
         target: agency
-        attributes:
+        properties:
         -   datetime_review
         -   datetime_announce
     -   source: analyst

@@ -5,7 +5,7 @@ schema:
         vertex_config:
             vertices:
             -   name: company
-                fields:
+                properties:
                 -   name
                 identity:
                 -   name
@@ -13,7 +13,7 @@ schema:
             edges:
             -   source: company
                 target: company
-                attributes:
+                properties:
                 -   date
     db_profile: {}
 ingestion_model:

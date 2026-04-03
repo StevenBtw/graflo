@@ -22,17 +22,17 @@ class _VertexConfigStub:
         self,
         vertex_set: set[str],
         identity_by_vertex: dict[str, list[str]] | None = None,
-        fields_by_vertex: dict[str, list[str]] | None = None,
+        property_names_by_vertex: dict[str, list[str]] | None = None,
     ):
         self.vertex_set = vertex_set
         self._identity_by_vertex = identity_by_vertex or {}
-        self._fields_by_vertex = fields_by_vertex or {}
+        self._property_names_by_vertex = property_names_by_vertex or {}
 
     def identity_fields(self, vertex_name: str) -> list[str]:
         return self._identity_by_vertex.get(vertex_name, [])
 
-    def fields_names(self, vertex_name: str) -> list[str]:
-        return self._fields_by_vertex.get(vertex_name, [])
+    def property_names(self, vertex_name: str) -> list[str]:
+        return self._property_names_by_vertex.get(vertex_name, [])
 
 
 class _AgraphStub:
@@ -66,7 +66,7 @@ def _build_plotter(
     configured_edges: dict,
     vertex_set: set[str],
     identity_by_vertex: dict[str, list[str]] | None = None,
-    fields_by_vertex: dict[str, list[str]] | None = None,
+    property_names_by_vertex: dict[str, list[str]] | None = None,
 ) -> ManifestPlotter:
     plotter = ManifestPlotter.__new__(ManifestPlotter)
     plotter.output_format = "pdf"
@@ -81,7 +81,7 @@ def _build_plotter(
             vertex_config=_VertexConfigStub(
                 vertex_set=vertex_set,
                 identity_by_vertex=identity_by_vertex,
-                fields_by_vertex=fields_by_vertex,
+                property_names_by_vertex=property_names_by_vertex,
             ),
         ),
     )
@@ -206,7 +206,7 @@ def test_plot_vc2fields_appends_schema_version_to_stem(monkeypatch):
         configured_edges={},
         vertex_set={"a"},
         identity_by_vertex={"a": ["id"]},
-        fields_by_vertex={"a": ["id", "name"]},
+        property_names_by_vertex={"a": ["id", "name"]},
     )
     plotter.schema.metadata.version = "2.3.4"
     captured = {}
